@@ -7,6 +7,7 @@ A Codex skill for installing, configuring, verifying, and troubleshooting a loca
 - A localhost-only CLIProxyAPI service backed by Codex OAuth
 - A separate `gpt-5.6-sol-fast` client alias that routes to `gpt-5.6-sol` and requests Priority processing
 - Claude Code `/model` mappings for GPT-5.6 models
+- A catalog-backed 272K Claude Code context ceiling scoped only to `claudex`
 - A hardened user-level systemd service
 - End-to-end model-list, normal-route, Fast-route, and shell validation
 
@@ -21,6 +22,16 @@ A Codex skill for installing, configuring, verifying, and troubleshooting a loca
 | Subagent | `gpt-5.6-sol` |
 
 The Fast entry is a client-visible alias, not a distinct upstream model. The skill reports Priority processing as confirmed only when response metadata confirms it.
+
+## 272K context management
+
+When the active Codex OAuth catalog reports a 272K model limit, the skill places this setting inside the `claudex` alias:
+
+```zsh
+CLAUDE_CODE_MAX_CONTEXT_TOKENS="272000"
+```
+
+This makes Claude Code report and manage a `272000`-token total context window for `claudex` without changing ordinary `claude` sessions. It does not use a `[1m]` model suffix and does not increase the upstream model limit. System instructions, tools, history, output allowance, and compaction leave less than 272K for user-provided files and prompts.
 
 ## Install the skill
 

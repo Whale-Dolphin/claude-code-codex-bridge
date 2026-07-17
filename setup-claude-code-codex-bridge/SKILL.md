@@ -1,6 +1,6 @@
 ---
 name: setup-claude-code-codex-bridge
-description: "Install, upgrade, configure, verify, and troubleshoot a localhost CLIProxyAPI bridge that exposes Codex OAuth models to Claude Code through an Anthropic-compatible endpoint. Use when setting up or repairing Claude Code access to GPT-5.6 Sol, Terra, or Luna; creating a separate gpt-5.6-sol-fast alias with Priority service tier; managing Codex device login or a user systemd service; editing shell model mappings; or validating Claude Code /model switching and end-to-end requests."
+description: "Install, upgrade, configure, verify, and troubleshoot a localhost CLIProxyAPI bridge that exposes Codex OAuth models to Claude Code through an Anthropic-compatible endpoint. Use when setting up or repairing Claude Code access to GPT-5.6 Sol, Terra, or Luna; creating a separate gpt-5.6-sol-fast alias with Priority service tier; managing Codex device login or a user systemd service; editing shell model mappings; limiting 272K context accounting to claudex; or validating Claude Code /model switching and end-to-end requests."
 ---
 
 # Setup Claude Code Codex Bridge
@@ -14,6 +14,9 @@ Bridge a ChatGPT Codex OAuth session into Claude Code through a local CLIProxyAP
 - Never print, copy into chat, or commit OAuth files, API keys, management secrets, or shell history containing credentials.
 - Bind the proxy to `127.0.0.1` unless the user explicitly authorizes network exposure.
 - Use model IDs returned by the current OAuth catalog. Do not infer access from public model documentation.
+- Match Claude Code context accounting to the active OAuth catalog, never above it. When the catalog reports `272000`, set `CLAUDE_CODE_MAX_CONTEXT_TOKENS="272000"` inside the `claudex` alias only; do not export it globally.
+- Do not add `[1m]` or another context suffix to Codex model IDs. A client-side setting cannot enlarge the upstream model window.
+- Describe 272K as the total managed context window, not 272K of file or prompt input. System instructions, tools, history, output allowance, and compaction consume part of it.
 - Treat `gpt-5.6-sol-fast` as a client-visible alias for `gpt-5.6-sol`, not as a separate upstream model.
 - Request Priority processing for the Fast alias, but do not claim the upstream honored it unless response metadata confirms that tier.
 - Request approval before downloading binaries, opening a browser, changing services outside the user scope, or performing any other action that requires elevated access.
@@ -170,6 +173,8 @@ If user systemd is unavailable, run the same `ExecStart` command in a supervised
 
 Patch one clearly labeled `claudex` block in the active shell startup file. Remove an older copy before adding a replacement so repeated runs stay idempotent.
 
+Before patching, inspect the current Codex OAuth catalog. Use `272000` below only when that catalog reports a 272K maximum for the selected models. Keep the variable inline in the alias so `claudex` receives it while ordinary `claude` sessions remain unchanged.
+
 For zsh, use:
 
 ```zsh
@@ -189,6 +194,7 @@ alias claudex='env -u CLAUDE_CODE_USE_BEDROCK \
         ANTHROPIC_DEFAULT_SONNET_MODEL="gpt-5.6-terra" \
         ANTHROPIC_DEFAULT_HAIKU_MODEL="gpt-5.6-luna" \
         CLAUDE_CODE_SUBAGENT_MODEL="gpt-5.6-sol" \
+        CLAUDE_CODE_MAX_CONTEXT_TOKENS="272000" \
         CLAUDE_CODE_ALWAYS_ENABLE_EFFORT="1" \
         CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY="3" \
         ENABLE_TOOL_SEARCH="false" \
@@ -201,7 +207,7 @@ Replace the placeholder with the same local proxy key used in `config.yaml`. Pre
 
 Verify in increasing order of cost:
 
-1. Validate shell syntax with `zsh -n ~/.zshrc` and inspect the expanded alias without printing unrelated credentials.
+1. Validate shell syntax with `zsh -n ~/.zshrc` and inspect the expanded alias without printing unrelated credentials. Confirm `CLAUDE_CODE_MAX_CONTEXT_TOKENS=272000` is present in `claudex`, while a fresh ordinary shell leaves the variable unset.
 2. Confirm the service is listening only on `127.0.0.1:8317`.
 3. Query `GET /v1/models` with the local proxy key and confirm these client-visible IDs are present:
    - `gpt-5.6-sol`
@@ -220,7 +226,15 @@ claudex -p --model gpt-5.6-sol 'Reply with exactly SOL_OK'
 claudex -p --model gpt-5.6-sol-fast --output-format json 'Reply with exactly FAST_OK'
 ```
 
-Keep verification prompts small. Trust the context limits published by the active OAuth model catalog rather than changing client-side accounting to imply a larger server allowance.
+Verify Claude Code's effective accounting with a small JSON request:
+
+```zsh
+claudex -p --model gpt-5.6-sol --tools "" --no-session-persistence \
+  --output-format json 'Reply with exactly CONTEXT_OK' |
+  jq '{result, models: (.modelUsage | to_entries | map({model: .key, contextWindow: .value.contextWindow}))}'
+```
+
+Require `contextWindow: 272000` before reporting success. The setting changes Claude Code's management and auto-compaction ceiling for this invocation; it does not prove that 272K tokens of user files fit in one request or raise a smaller upstream limit. Keep verification prompts small unless the user explicitly requests a costly near-limit test.
 
 ## 8. Modify mappings safely
 
@@ -237,6 +251,7 @@ Keep verification prompts small. Trust the context limits published by the activ
 - **Alias replaces the original:** set `fork: true` and restart or reload the proxy.
 - **Fast request succeeds but reports the standard tier:** the alias routing works, but the upstream did not confirm Priority processing; report that limitation accurately.
 - **Claude Code shows stale mappings:** open a new shell or source the startup file, then restart Claude Code. If Claude Code starts from a GUI or a different shell, configure that launch environment because it may not read `.zshrc`.
+- **Claude Code still reports 200K:** confirm the 272K environment variable is inside the expanded `claudex` alias, start a fresh shell, and repeat the JSON `modelUsage` check. Do not work around the mismatch with a `[1m]` model suffix.
 - **Service repeatedly restarts:** inspect `journalctl --user -u cliproxyapi.service`, validate YAML, verify binary permissions, and confirm the auth directory is writable under the service sandbox.
 - **OAuth model list changes:** treat the latest catalog as authoritative and update mappings only to IDs the account currently exposes.
 
