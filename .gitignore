@@ -1,0 +1,20 @@
+# Credentials and local configuration
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+auth.json
+config.yaml
+.cli-proxy-api/
+cliproxyapi/
+
+# Logs, archives, and local tooling
+*.log
+*.tar
+*.tar.gz
+*.zip
+.DS_Store
+.idea/
+.vscode/

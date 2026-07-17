@@ -1,0 +1,4 @@
+interface:
+  display_name: "Setup Claude Code Codex Bridge"
+  short_description: "Bridge Codex OAuth models into Claude Code locally"
+  default_prompt: "Use $setup-claude-code-codex-bridge to install or update the local CLIProxyAPI bridge, map Codex models in Claude Code, and verify model switching."
