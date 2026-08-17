@@ -1,4 +1,4 @@
 interface:
   display_name: "Setup Claude Code Codex Bridge"
-  short_description: "Bridge Codex models into Claude Code with 272K context"
-  default_prompt: "Use $setup-claude-code-codex-bridge to install or update the local bridge, scope catalog-backed 272K context management to claudex, and verify model switching."
+  short_description: "Bridge Codex Sol into Claude Code with [1m] context"
+  default_prompt: "Use $setup-claude-code-codex-bridge to install or update the local bridge, activate 1M Claude Code context for Sol with [1m] model suffixes, scope it to claudex, and verify model switching."

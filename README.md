@@ -7,7 +7,7 @@ A Codex skill for installing, configuring, verifying, and troubleshooting a loca
 - A localhost-only CLIProxyAPI service backed by Codex OAuth
 - A separate `gpt-5.6-sol-fast` client alias that routes to `gpt-5.6-sol` and requests Priority processing
 - Claude Code `/model` mappings for GPT-5.6 models
-- A catalog-backed 272K Claude Code context ceiling scoped only to `claudex`
+- A 1M Claude Code managed context profile for Sol, activated with `[1m]` model suffixes and scoped only to `claudex`
 - A hardened user-level systemd service
 - End-to-end model-list, normal-route, Fast-route, and shell validation
 
@@ -15,23 +15,23 @@ A Codex skill for installing, configuring, verifying, and troubleshooting a loca
 
 | Claude Code label | Model |
 | --- | --- |
-| Fable | `gpt-5.6-sol-fast` |
-| Opus | `gpt-5.6-sol` |
+| Fable | `gpt-5.6-sol-fast[1m]` |
+| Opus | `gpt-5.6-sol[1m]` |
 | Sonnet | `gpt-5.6-terra` |
 | Haiku | `gpt-5.6-luna` |
-| Subagent | `gpt-5.6-sol` |
+| Subagent | `gpt-5.6-sol[1m]` |
 
-The Fast entry is a client-visible alias, not a distinct upstream model. The skill reports Priority processing as confirmed only when response metadata confirms it.
+The Fast entry is a client-visible alias for Sol, not a distinct upstream model. The `[1m]` suffix is used only on the Claude Code-facing Sol and Sol Fast names; Terra and Luna remain unsuffixed. CLIProxyAPI continues to expose and route canonical unsuffixed model IDs. The skill reports Priority processing as confirmed only when response metadata confirms it.
 
-## 272K context management
+## 1M context management
 
-When the active Codex OAuth catalog reports a 272K model limit, the skill places this setting inside the `claudex` alias:
+The skill combines Claude Code-facing `[1m]` suffixes on Sol and Sol Fast with this client-side context setting inside the `claudex` alias:
 
 ```zsh
-CLAUDE_CODE_MAX_CONTEXT_TOKENS="272000"
+CLAUDE_CODE_MAX_CONTEXT_TOKENS="1000000"
 ```
 
-This makes Claude Code report and manage a `272000`-token total context window for `claudex` without changing ordinary `claude` sessions. It does not use a `[1m]` model suffix and does not increase the upstream model limit. System instructions, tools, history, output allowance, and compaction leave less than 272K for user-provided files and prompts.
+The suffix activates Claude Code's 1M model profile, while the environment variable makes its managed context ceiling explicit. Together they make Claude Code report and manage a `1000000`-token total context window for `claudex` without changing ordinary `claude` sessions. They do not increase an upstream model limit. The active Codex catalog may report a smaller per-model window; report that discrepancy instead of presenting the client setting as proof of upstream capacity. System instructions, tools, history, output allowance, and compaction leave less than 1M for user-provided files and prompts.
 
 ## Install the skill
 
