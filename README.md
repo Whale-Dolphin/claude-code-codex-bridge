@@ -5,7 +5,7 @@ A Codex skill for installing, configuring, verifying, and troubleshooting a loca
 ## What it configures
 
 - A localhost-only CLIProxyAPI service backed by Codex OAuth
-- Separate `gpt-6-astra-fast` and `gpt-5.6-sol-fast` client aliases, each requesting `xhigh` reasoning and Priority processing
+- Separate `gpt-6-astra-fast` and `gpt-5.6-sol-fast` client aliases, each following Claude Code's effort and requesting Priority processing
 - Claude Code `/model` mappings with Fable as the default Astra Fast route and Opus as the Sol Fast route
 - A 1M Claude Code managed context profile for both Fast routes, activated with `[1m]` model suffixes and scoped only to `claudex`
 - A hardened user-level systemd service
@@ -15,15 +15,32 @@ A Codex skill for installing, configuring, verifying, and troubleshooting a loca
 
 | Claude Code label | Model | Reasoning / processing |
 | --- | --- | --- |
-| Fable (default) | `gpt-6-astra-fast[1m]` | `xhigh` / requested Priority |
-| Opus | `gpt-5.6-sol-fast[1m]` | `xhigh` / requested Priority |
+| Fable (default) | `gpt-6-astra-fast[1m]` | CC effort (default `xhigh`) / requested Priority |
+| Opus | `gpt-5.6-sol-fast[1m]` | CC effort (default `xhigh`) / requested Priority |
 | Sonnet | `gpt-5.6-terra` | Existing provider behavior |
 | Haiku | `gpt-5.6-luna` | Existing provider behavior |
-| Subagent | `gpt-6-astra-fast[1m]` | `xhigh` / requested Priority |
+| Subagent | `gpt-6-astra-fast[1m]` | CC-selected effort / requested Priority |
 
-Each Fast entry is a client-visible alias for its canonical upstream model (`gpt-6-astra` or `gpt-5.6-sol`). Keep `fork: true` so the canonical routes remain available. The bridge overrides `reasoning.effort: xhigh` and `service_tier: priority` only for the two Fast aliases. `claudex` launches with `--model fable --effort xhigh`; use `claudex --model opus` or `/model` to select Sol Fast.
+Each Fast entry is a client-visible alias for its canonical upstream model (`gpt-6-astra` or `gpt-5.6-sol`). Keep `fork: true` so the canonical routes remain available. The bridge overrides only `service_tier: priority` for the two Fast aliases; it must not override `reasoning.effort`. `claudex` launches with `--model fable --effort xhigh`; use `claudex --model opus` or `/model` to select Sol Fast.
 
 The `[1m]` suffix belongs to the Claude Code-facing names; Terra and Luna remain unsuffixed, and CLIProxyAPI's aliases and canonical IDs remain unsuffixed. The skill reports Priority processing as confirmed only when upstream response metadata confirms it. A successful Fast alias response alone does not establish a Priority grant.
+
+## Effort and ultracode
+
+CC sends adaptive thinking with `output_config.effort`; CLIProxyAPI translates it into Codex `reasoning.effort`. The default is `xhigh`, not a server-side lock. Change a running session with `/effort max`, or launch `claudex --effort max` (append `--model opus` for Sol).
+
+| CC selection | Codex display label | Upstream effort |
+| --- | --- | --- |
+| `low` | Light | `low` |
+| `medium` | Medium | `medium` |
+| `high` | High | `high` |
+| `xhigh` | Extra High | `xhigh` |
+| `max` | Max | `max` |
+| `ultracode` | Not Codex Ultra | `xhigh`, plus CC-owned dynamic workflows |
+
+`ultracode` is a CC mode, not an upstream model effort. CC remains responsible for workflows, tools, and subagents; the bridge does not start a Codex agent or turn on Codex Ultra. Workflow availability depends on CC settings and model capabilities. Never report it as active based only on an `xhigh` request: verify the CC activation reminder and Workflow tool. Do not set a fixed `CLAUDE_CODE_EFFORT_LEVEL` in the wrapper, because it can override session choices and disable ultracode orchestration.
+
+These are parameter mappings, not equal token/compute budgets across models. See the official [CC effort and ultracode documentation](https://code.claude.com/docs/en/model-config#adjust-effort-level) and [Codex model controls](https://learn.chatgpt.com/docs/models). Legacy fixed `thinking.budget_tokens` is a separate conversion path; use adaptive thinking for five-level alignment.
 
 ## 1M context management
 
@@ -44,7 +61,7 @@ python3 setup-claude-code-codex-bridge/scripts/verify_profile.py \
   --claudex "$HOME/cliproxyapi/claudex"
 ```
 
-This is a small connectivity and tool-use check, not a near-limit context test or proof of upstream Priority processing. Validate `reasoning.effort` and `service_tier` separately through Responses metadata as described in the skill.
+Repeat with `--effort max` to verify tool use and 1M accounting at the highest native effort. For the full client-wire, upstream-metadata, and E2E test matrix, see [verification](setup-claude-code-codex-bridge/references/verification.md). These are small connectivity/contract checks, not quality benchmarks, near-limit context tests, or proof of upstream Priority processing.
 
 ## Install the skill
 
@@ -58,7 +75,7 @@ cp -R claude-code-codex-bridge/setup-claude-code-codex-bridge \
 Restart Codex after installation, then invoke it with:
 
 ```text
-Use $setup-claude-code-codex-bridge to configure Fable as Astra xhigh Fast, Opus as Sol xhigh Fast, preserve [1m] on both, and verify the default and model switching.
+Use $setup-claude-code-codex-bridge to configure Fable as Astra Fast and Opus as Sol Fast with [1m], default to xhigh while following CC effort changes, preserve CC ultracode, and verify both routes.
 ```
 
 ## Security
@@ -76,6 +93,9 @@ Before publishing changes, stage only the files in this repository and run a sec
     ├── SKILL.md
     ├── agents/
     │   └── openai.yaml
+    ├── references/
+    │   └── verification.md
     └── scripts/
+        ├── verify_effort.py
         └── verify_profile.py
 ```

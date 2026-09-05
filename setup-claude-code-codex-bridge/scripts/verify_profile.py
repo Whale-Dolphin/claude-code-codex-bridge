@@ -13,8 +13,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--claudex', type=Path, default=Path.home() / 'cliproxyapi/claudex')
     parser.add_argument('--timeout', type=int, default=120)
+    parser.add_argument('--effort', choices=('low', 'medium', 'high', 'xhigh', 'max', 'ultracode'))
     args = parser.parse_args()
     wrapper = args.claudex.expanduser().resolve(strict=True)
+    effort_args = ['--effort', args.effort] if args.effort else []
     routes = [
         ('fable-default', [], 'gpt-6-astra-fast[1m]'),
         ('opus', ['--model', 'opus'], 'gpt-5.6-sol-fast[1m]'),
@@ -24,7 +26,7 @@ def main() -> None:
         (Path(workdir) / 'fixture.txt').write_text(expected + '\n', encoding='utf-8')
         for label, model_args, expected_model in routes:
             result = subprocess.run([
-                str(wrapper), '-p', *model_args,
+                str(wrapper), '-p', *model_args, *effort_args,
                 '--tools', 'Read', '--allowedTools', 'Read',
                 '--setting-sources', '', '--strict-mcp-config',
                 '--mcp-config', '{"mcpServers":{}}',
@@ -43,7 +45,7 @@ def main() -> None:
                 and model_usage.get('contextWindow') == 1000000
             )
             print(json.dumps({
-                'route': label, 'passed': passed,
+                'route': label, 'passed': passed, 'selected_effort': args.effort or 'default',
                 'expected_model': expected_model,
                 'reported_models': list(payload.get('modelUsage', {})),
                 'contextWindow': model_usage.get('contextWindow'),

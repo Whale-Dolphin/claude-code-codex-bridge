@@ -1,4 +1,4 @@
 interface:
   display_name: "Setup Claude Code Codex Bridge"
-  short_description: "Bridge Astra/Sol xhigh Fast with [1m] into Claude Code"
-  default_prompt: "Use $setup-claude-code-codex-bridge to make Fable the default Astra xhigh Fast route, map Opus to Sol xhigh Fast, preserve [1m] for both inside claudex, and verify model switching."
+  short_description: "Bridge Astra/Sol Fast with CC effort and [1m] context"
+  default_prompt: "Use $setup-claude-code-codex-bridge to map Fable to Astra Fast and Opus to Sol Fast with [1m], default to xhigh while following CC effort changes, preserve CC ultracode, and verify both routes."

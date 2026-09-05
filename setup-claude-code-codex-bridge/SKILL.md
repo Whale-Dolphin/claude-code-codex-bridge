@@ -1,11 +1,11 @@
 ---
 name: setup-claude-code-codex-bridge
-description: "Install, upgrade, configure, and verify a CLIProxyAPI bridge from Codex OAuth to Claude Code. Use for the claudex Fable/Astra and Opus/Sol xhigh Fast mappings, [1m] context, device login, service setup, and model switching."
+description: "Install, upgrade, configure, and verify a CLIProxyAPI bridge from Codex OAuth to Claude Code. Use for claudex Fable/Astra and Opus/Sol Fast mappings, CC effort alignment and ultracode, [1m] context, login, and service setup."
 ---
 
 # Setup Claude Code Codex Bridge
 
-Bridge a ChatGPT Codex OAuth session into Claude Code through a local CLIProxyAPI server. The default profile launches Fable as Astra xhigh Fast and maps Opus to Sol xhigh Fast, both with `[1m]`. Preserve existing configuration and explicitly authorized network exposure, and verify each layer before declaring success.
+Bridge a ChatGPT Codex OAuth session into Claude Code through a local CLIProxyAPI server. The profile launches Fable as Astra Fast and maps Opus to Sol Fast, both with `[1m]`. Default to `xhigh` but follow CC effort changes; preserve CC-owned ultracode workflows. Preserve existing configuration and explicitly authorized network exposure, and verify each layer before declaring success.
 
 ## Operating rules
 
@@ -18,7 +18,8 @@ Bridge a ChatGPT Codex OAuth session into Claude Code through a local CLIProxyAP
 - Keep CLIProxyAPI's canonical OAuth model names and `/v1/models` entries unsuffixed. The `[1m]` suffix belongs only to Claude Code-facing mappings. If the catalog reports a smaller per-model maximum, report the discrepancy and describe 1M as client-side management rather than proven upstream capacity.
 - Describe 1M as the total managed context window, not 1M of file or prompt input. System instructions, tools, history, output allowance, and compaction consume part of it.
 - Treat `gpt-6-astra-fast` and `gpt-5.6-sol-fast` as client-visible aliases for `gpt-6-astra` and `gpt-5.6-sol`, respectively, not as separate upstream models.
-- Override `reasoning.effort` to `xhigh` and request Priority processing for both Fast aliases. Do not claim the upstream honored Priority unless response metadata confirms that tier.
+- Request Priority processing for both Fast aliases, but do not override `reasoning.effort`: CC must control it. Remove the old forced `xhigh` rule when upgrading this profile. Do not claim the upstream honored Priority unless response metadata confirms that tier.
+- CC `low`, `medium`, `high`, `xhigh`, and `max` map to the same Codex API values. Codex displays `low` as Light and `xhigh` as Extra High. CC `ultracode` sends `xhigh` plus CC-owned dynamic workflows, not Codex `ultra`; never transmit `ultracode` as an API effort or claim Codex agent orchestration is running.
 - Request approval before downloading binaries, opening a browser, changing services outside the user scope, or performing any other action that requires elevated access.
 
 ## Default paths
@@ -116,10 +117,9 @@ payload:
           protocol: "codex"
       params:
         service_tier: "priority"
-        "reasoning.effort": "xhigh"
 ```
 
-Keep `fork: true` on both aliases so Astra and Sol remain available under their canonical IDs. Use `payload.override` because the two Fast routes must overwrite conflicting client values for reasoning effort and service tier. Match only the two aliases, so explicit canonical requests and Terra/Luna retain their existing behavior.
+Keep `fork: true` on both aliases so Astra and Sol remain available under their canonical IDs. Use `payload.override` only for the Fast service tier. Do not add a default or override reasoning rule: the CC launcher provides the default, and the translator preserves explicit CC effort. Match only the two aliases, so explicit canonical requests and Terra/Luna retain their existing behavior.
 
 Validate the YAML with an available parser before restarting. Never print the unredacted file in tool output.
 
@@ -185,7 +185,7 @@ For zsh, use:
 
 ```zsh
 # Claude Code /model mapping for the local Codex bridge:
-# Fable (default) = gpt-6-astra-fast[1m], Opus = gpt-5.6-sol-fast[1m]; both xhigh.
+# Fable (default) = gpt-6-astra-fast[1m], Opus = gpt-5.6-sol-fast[1m]; default effort xhigh.
 # Sonnet = gpt-5.6-terra, Haiku = gpt-5.6-luna.
 unalias claudex 2>/dev/null
 alias claudex='env -u CLAUDE_CODE_USE_BEDROCK \
@@ -209,7 +209,11 @@ alias claudex='env -u CLAUDE_CODE_USE_BEDROCK \
 
 Replace the placeholder with the same local proxy key used in `config.yaml`. Preserve every unrelated alias and environment variable in the shell file.
 
-The trailing `--model fable` selects the Fable label itself; its environment mapping resolves to Astra Fast. The client `--effort xhigh` makes the selected effort visible in Claude Code, while the alias-specific bridge rule enforces it upstream even if a client supplies a different value. Keep this rule scoped to the two Fast aliases.
+The trailing `--model fable` selects the Fable label itself; its environment mapping resolves to Astra Fast. `--effort xhigh` is a launch default, not an upstream override. In an executable wrapper, append user arguments after these defaults so `claudex --effort max` can override them. In a running interactive session use `/effort low`, `/effort medium`, `/effort high`, `/effort xhigh`, or `/effort max`.
+
+Do not hard-code `CLAUDE_CODE_EFFORT_LEVEL`: it can override session choices and prevent ultracode workflows. If the user already supplies it, report the precedence rather than silently removing their setting. CC should send `thinking.type: adaptive` and `output_config.effort`; do not substitute a fixed `MAX_THINKING_TOKENS` budget for this five-level contract.
+
+Use `claudex --effort ultracode` or interactive `/effort ultracode` to keep CC's native `xhigh` plus workflow mode (requires CC 2.1.203+ and enabled dynamic workflows). Do not force-enable workflows against user settings. Confirm the actual request has the ultracode activation reminder and Workflow tool; a successful `xhigh` response alone proves neither workflow activation nor delegation. The bridge invokes model APIs, not a Codex agent. See [CC effort documentation](https://code.claude.com/docs/en/model-config#adjust-effort-level).
 
 ## 7. Verify end to end
 
@@ -225,7 +229,7 @@ Verify in increasing order of cost:
    - `gpt-5.6-terra`
    - `gpt-5.6-luna`
 4. Send a minimal request through plain `claudex` with no model override and require an exact response plus `gpt-6-astra-fast[1m]` in the JSON model usage. This verifies the default Fable mapping, not just an explicitly selected model ID.
-5. Repeat through `claudex --model opus` and require `gpt-5.6-sol-fast[1m]`. Send small Responses API requests to both unsuffixed Fast aliases and inspect returned canonical model and `reasoning.effort`; the expected effort is `xhigh`. Inspect `service_tier` separately and describe Priority as unconfirmed unless returned metadata reports it.
+5. Repeat through `claudex --model opus` and require `gpt-5.6-sol-fast[1m]`. Capture the client's five effort levels and ultracode wire behavior, then send small Responses API requests to both unsuffixed Fast aliases and require the returned canonical model and `reasoning.effort` to match each requested level. Inspect `service_tier` separately and describe Priority as unconfirmed unless returned metadata reports it.
 6. Start `claudex`, run `/model`, and confirm the Fable, Opus, Sonnet, and Haiku entries resolve to their intended IDs.
 
 For the default/Opus model, Read tool round-trip, and 1M client-accounting checks, run the included standard-library verifier:
@@ -234,7 +238,7 @@ For the default/Opus model, Read tool round-trip, and 1M client-accounting check
 python3 scripts/verify_profile.py --claudex "$HOME/cliproxyapi/claudex"
 ```
 
-Run it from this skill directory. It invokes the executable wrapper directly, so pass its actual path when the install uses a different layout. For a shell-only alias, use the manual checks below and a small read-only tool request. The verifier does not establish upstream Priority or context capacity.
+Run it from this skill directory. Repeat with `--effort max` and `--effort ultracode` as appropriate. It invokes the executable wrapper directly, so pass its actual path when the install uses a different layout. For a shell-only alias, use the manual checks below and a small read-only tool request. The verifier does not establish upstream Priority or context capacity. When updating effort or ultracode behavior, read [references/verification.md](references/verification.md) for the client-wire and real-upstream tests; do not confuse either stage alone with full E2E verification.
 
 Example minimal checks after loading the shell config:
 
@@ -256,7 +260,7 @@ Require the reported model name to retain `[1m]` and `contextWindow: 1000000` be
 
 ## 8. Modify mappings safely
 
-- To change Claude Code's Fable, Opus, Sonnet, Haiku, or Subagent selection, patch only the corresponding environment variable and the trailing default `--model` when requested. This profile uses Fable/Astra Fast by default and Opus/Sol Fast, both with `[1m]` and `xhigh`; keep Terra and Luna unsuffixed unless their upstream context support is separately verified.
+- To change Claude Code's Fable, Opus, Sonnet, Haiku, or Subagent selection, patch only the corresponding environment variable and the trailing default `--model` when requested. This profile uses Fable/Astra Fast by default and Opus/Sol Fast, both with `[1m]` and CC-selected effort (launch default `xhigh`); keep Terra and Luna unsuffixed unless their upstream context support is separately verified.
 - To expose another client-visible alias, add it under `oauth-model-alias.codex`, keep the canonical upstream name in `name`, and decide explicitly whether `fork` should preserve the original.
 - To attach request behavior to an alias, add a narrowly matched `payload` rule with `protocol: "codex"`.
 - Restart or reload the proxy, refresh the shell, and repeat the model-list plus minimal-request checks after every mapping change.
@@ -267,7 +271,8 @@ Require the reported model name to retain `[1m]` and `contextWindow: 1000000` be
 - **401 from the local endpoint:** make the proxy key in Claude Code match one entry under `api-keys`.
 - **Unknown model:** inspect `/v1/models`, confirm the OAuth account exposes the unsuffixed canonical model, and verify the alias is under the `codex` channel. Keep `[1m]` out of the CLIProxyAPI OAuth alias configuration and off Terra/Luna mappings.
 - **Alias replaces the original:** set `fork: true` on both Fast aliases and restart or reload the proxy.
-- **Fast route reports the wrong reasoning effort:** confirm both aliases are listed in the `protocol: codex` override rule with `"reasoning.effort": "xhigh"`. Inspect the upstream Responses metadata rather than inferring effort from the model's answer.
+- **Fast route stays at xhigh after CC changes effort:** remove the legacy `"reasoning.effort": "xhigh"` payload override while preserving the Priority rule. Inspect `CLAUDE_CODE_EFFORT_LEVEL` precedence and capture CC's `thinking.type` and `output_config.effort`. Verify upstream metadata rather than inferring effort from the model's answer.
+- **Ultracode only behaves like xhigh:** check the CC version, workflow setting, model capability detection, environment effort override, and activation reminder. Report disabled workflows honestly; do not rewrite the upstream effort to `ultra` as a workaround.
 - **Fast request succeeds but reports the standard tier:** the alias routing works, but the upstream did not confirm Priority processing; report that limitation accurately.
 - **Claude Code shows stale mappings:** open a new shell or source the startup file, then restart Claude Code. If Claude Code starts from a GUI or a different shell, configure that launch environment because it may not read `.zshrc`.
 - **Claude Code still reports less than 1M:** confirm both the `[1m]` suffix and `1000000` environment variable are present in the expanded `claudex` alias, start a fresh shell, and repeat the JSON `modelUsage` check.
