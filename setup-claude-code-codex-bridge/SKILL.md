@@ -1,11 +1,11 @@
 ---
 name: setup-claude-code-codex-bridge
-description: "Install, upgrade, configure, verify, and troubleshoot a localhost CLIProxyAPI bridge that exposes Codex OAuth models to Claude Code through an Anthropic-compatible endpoint. Use when setting up or repairing Claude Code access to GPT-5.6 Sol, Terra, or Luna; creating a separate gpt-5.6-sol-fast alias with Priority service tier; managing Codex device login or a user systemd service; editing shell model mappings; activating 1M Claude Code context for Sol with [1m] model suffixes; or validating Claude Code /model switching and end-to-end requests."
+description: "Install, upgrade, configure, and verify a CLIProxyAPI bridge from Codex OAuth to Claude Code. Use for the claudex Fable/Astra and Opus/Sol xhigh Fast mappings, [1m] context, device login, service setup, and model switching."
 ---
 
 # Setup Claude Code Codex Bridge
 
-Bridge a ChatGPT Codex OAuth session into Claude Code through a local CLIProxyAPI server. Preserve existing configuration, keep the listener private to localhost, and verify each layer before declaring success.
+Bridge a ChatGPT Codex OAuth session into Claude Code through a local CLIProxyAPI server. The default profile launches Fable as Astra xhigh Fast and maps Opus to Sol xhigh Fast, both with `[1m]`. Preserve existing configuration and explicitly authorized network exposure, and verify each layer before declaring success.
 
 ## Operating rules
 
@@ -14,11 +14,11 @@ Bridge a ChatGPT Codex OAuth session into Claude Code through a local CLIProxyAP
 - Never print, copy into chat, or commit OAuth files, API keys, management secrets, or shell history containing credentials.
 - Bind the proxy to `127.0.0.1` unless the user explicitly authorizes network exposure.
 - Use model IDs returned by the current OAuth catalog. Do not infer access from public model documentation.
-- Inspect the active OAuth catalog before changing context accounting. This profile appends `[1m]` only to the Claude Code-facing Sol and Sol Fast names and sets `CLAUDE_CODE_MAX_CONTEXT_TOKENS="1000000"` inside the `claudex` alias only; do not export it globally. Keep Terra and Luna unsuffixed.
-- Keep CLIProxyAPI's canonical OAuth model names and `/v1/models` entries unsuffixed. The `[1m]` suffix belongs only to Claude Code-facing Sol mappings. If the catalog reports a smaller per-model maximum, report the discrepancy and describe 1M as client-side management rather than proven upstream capacity.
+- Inspect the active OAuth catalog before changing context accounting. This profile appends `[1m]` to the Claude Code-facing Astra Fast and Sol Fast names and sets `CLAUDE_CODE_MAX_CONTEXT_TOKENS="1000000"` inside the `claudex` alias only; do not export it globally. Keep Terra and Luna unsuffixed.
+- Keep CLIProxyAPI's canonical OAuth model names and `/v1/models` entries unsuffixed. The `[1m]` suffix belongs only to Claude Code-facing mappings. If the catalog reports a smaller per-model maximum, report the discrepancy and describe 1M as client-side management rather than proven upstream capacity.
 - Describe 1M as the total managed context window, not 1M of file or prompt input. System instructions, tools, history, output allowance, and compaction consume part of it.
-- Treat `gpt-5.6-sol-fast` as a client-visible alias for `gpt-5.6-sol`, not as a separate upstream model.
-- Request Priority processing for the Fast alias, but do not claim the upstream honored it unless response metadata confirms that tier.
+- Treat `gpt-6-astra-fast` and `gpt-5.6-sol-fast` as client-visible aliases for `gpt-6-astra` and `gpt-5.6-sol`, respectively, not as separate upstream models.
+- Override `reasoning.effort` to `xhigh` and request Priority processing for both Fast aliases. Do not claim the upstream honored Priority unless response metadata confirms that tier.
 - Request approval before downloading binaries, opening a browser, changing services outside the user scope, or performing any other action that requires elevated access.
 
 ## Default paths
@@ -100,6 +100,9 @@ ws-auth: true
 
 oauth-model-alias:
   codex:
+    - name: "gpt-6-astra"
+      alias: "gpt-6-astra-fast"
+      fork: true
     - name: "gpt-5.6-sol"
       alias: "gpt-5.6-sol-fast"
       fork: true
@@ -107,13 +110,16 @@ oauth-model-alias:
 payload:
   override:
     - models:
+        - name: "gpt-6-astra-fast"
+          protocol: "codex"
         - name: "gpt-5.6-sol-fast"
           protocol: "codex"
       params:
         service_tier: "priority"
+        "reasoning.effort": "xhigh"
 ```
 
-Keep `fork: true` so both `gpt-5.6-sol` and `gpt-5.6-sol-fast` remain visible. Use `payload.override` because the Fast route must overwrite any conflicting client value.
+Keep `fork: true` on both aliases so Astra and Sol remain available under their canonical IDs. Use `payload.override` because the two Fast routes must overwrite conflicting client values for reasoning effort and service tier. Match only the two aliases, so explicit canonical requests and Terra/Luna retain their existing behavior.
 
 Validate the YAML with an available parser before restarting. Never print the unredacted file in tool output.
 
@@ -173,13 +179,13 @@ If user systemd is unavailable, run the same `ExecStart` command in a supervised
 
 Patch one clearly labeled `claudex` block in the active shell startup file. Remove an older copy before adding a replacement so repeated runs stay idempotent.
 
-Before patching, inspect the current Codex OAuth catalog. This profile uses `[1m]` suffixes on Sol and Sol Fast plus `1000000` for Claude Code's client-side managed window. Terra and Luna stay unsuffixed. When the catalog advertises a smaller maximum for a selected model, surface that mismatch and do not claim the settings raise the upstream limit. Keep the variable inline in the alias so `claudex` receives it while ordinary `claude` sessions remain unchanged.
+Before patching, inspect the current Codex OAuth catalog. This profile uses `[1m]` suffixes on Astra Fast and Sol Fast plus `1000000` for Claude Code's client-side managed window. Terra and Luna stay unsuffixed. When the catalog advertises a smaller maximum for a selected model, surface that mismatch and do not claim the settings raise the upstream limit. Keep the variable inline in the alias so `claudex` receives it while ordinary `claude` sessions remain unchanged.
 
 For zsh, use:
 
 ```zsh
 # Claude Code /model mapping for the local Codex bridge:
-# Fable = gpt-5.6-sol-fast[1m], Opus = gpt-5.6-sol[1m],
+# Fable (default) = gpt-6-astra-fast[1m], Opus = gpt-5.6-sol-fast[1m]; both xhigh.
 # Sonnet = gpt-5.6-terra, Haiku = gpt-5.6-luna.
 unalias claudex 2>/dev/null
 alias claudex='env -u CLAUDE_CODE_USE_BEDROCK \
@@ -189,47 +195,59 @@ alias claudex='env -u CLAUDE_CODE_USE_BEDROCK \
         ANTHROPIC_BASE_URL="http://127.0.0.1:8317" \
         ANTHROPIC_AUTH_TOKEN="<random-local-proxy-key>" \
         ANTHROPIC_API_KEY="" \
-        ANTHROPIC_DEFAULT_FABLE_MODEL="gpt-5.6-sol-fast[1m]" \
-        ANTHROPIC_DEFAULT_OPUS_MODEL="gpt-5.6-sol[1m]" \
+        ANTHROPIC_DEFAULT_FABLE_MODEL="gpt-6-astra-fast[1m]" \
+        ANTHROPIC_DEFAULT_OPUS_MODEL="gpt-5.6-sol-fast[1m]" \
         ANTHROPIC_DEFAULT_SONNET_MODEL="gpt-5.6-terra" \
         ANTHROPIC_DEFAULT_HAIKU_MODEL="gpt-5.6-luna" \
-        CLAUDE_CODE_SUBAGENT_MODEL="gpt-5.6-sol[1m]" \
+        CLAUDE_CODE_SUBAGENT_MODEL="gpt-6-astra-fast[1m]" \
         CLAUDE_CODE_MAX_CONTEXT_TOKENS="1000000" \
         CLAUDE_CODE_ALWAYS_ENABLE_EFFORT="1" \
         CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY="3" \
         ENABLE_TOOL_SEARCH="false" \
-        claude --model "gpt-5.6-sol[1m]"'
+        claude --model fable --effort xhigh'
 ```
 
 Replace the placeholder with the same local proxy key used in `config.yaml`. Preserve every unrelated alias and environment variable in the shell file.
+
+The trailing `--model fable` selects the Fable label itself; its environment mapping resolves to Astra Fast. The client `--effort xhigh` makes the selected effort visible in Claude Code, while the alias-specific bridge rule enforces it upstream even if a client supplies a different value. Keep this rule scoped to the two Fast aliases.
 
 ## 7. Verify end to end
 
 Verify in increasing order of cost:
 
-1. Validate shell syntax with `zsh -n ~/.zshrc` and inspect the expanded alias without printing unrelated credentials. Confirm the Claude Code-facing Sol and Sol Fast names end in `[1m]`, Terra and Luna stay unsuffixed, and `CLAUDE_CODE_MAX_CONTEXT_TOKENS=1000000` is present in `claudex`, while a fresh ordinary shell leaves the variable unset.
-2. Confirm the service is listening only on `127.0.0.1:8317`.
+1. Validate shell syntax with `zsh -n ~/.zshrc` and inspect only non-secret fields of the alias or wrapper. Confirm Fable is Astra Fast, Opus is Sol Fast, both end in `[1m]`, and the launcher selects `--model fable --effort xhigh`. Terra and Luna stay unsuffixed, and `CLAUDE_CODE_MAX_CONTEXT_TOKENS=1000000` is scoped to `claudex`.
+2. Confirm the listener matches the authorized exposure: localhost by default, or the user's explicitly selected network interface and firewall scope.
 3. Query `GET /v1/models` with the local proxy key and confirm these client-visible IDs are present:
+   - `gpt-6-astra`
+   - `gpt-6-astra-fast`
    - `gpt-5.6-sol`
    - `gpt-5.6-sol-fast`
    - `gpt-5.6-terra`
    - `gpt-5.6-luna`
-4. Send a minimal non-interactive request through `gpt-5.6-sol[1m]` and require an exact short response.
-5. Send the same request through `gpt-5.6-sol-fast[1m]`. Confirm routing success, but describe Priority activation as unconfirmed unless returned metadata reports the requested tier.
+4. Send a minimal request through plain `claudex` with no model override and require an exact response plus `gpt-6-astra-fast[1m]` in the JSON model usage. This verifies the default Fable mapping, not just an explicitly selected model ID.
+5. Repeat through `claudex --model opus` and require `gpt-5.6-sol-fast[1m]`. Send small Responses API requests to both unsuffixed Fast aliases and inspect returned canonical model and `reasoning.effort`; the expected effort is `xhigh`. Inspect `service_tier` separately and describe Priority as unconfirmed unless returned metadata reports it.
 6. Start `claudex`, run `/model`, and confirm the Fable, Opus, Sonnet, and Haiku entries resolve to their intended IDs.
+
+For the default/Opus model, Read tool round-trip, and 1M client-accounting checks, run the included standard-library verifier:
+
+```bash
+python3 scripts/verify_profile.py --claudex "$HOME/cliproxyapi/claudex"
+```
+
+Run it from this skill directory. It invokes the executable wrapper directly, so pass its actual path when the install uses a different layout. For a shell-only alias, use the manual checks below and a small read-only tool request. The verifier does not establish upstream Priority or context capacity.
 
 Example minimal checks after loading the shell config:
 
 ```zsh
 source ~/.zshrc
-claudex -p --model 'gpt-5.6-sol[1m]' 'Reply with exactly SOL_OK'
-claudex -p --model 'gpt-5.6-sol-fast[1m]' --output-format json 'Reply with exactly FAST_OK'
+claudex -p --output-format json 'Reply with exactly ASTRA_FAST_OK'
+claudex -p --model opus --output-format json 'Reply with exactly SOL_FAST_OK'
 ```
 
 Verify Claude Code's effective accounting with a small JSON request:
 
 ```zsh
-claudex -p --model 'gpt-5.6-sol[1m]' --tools "" --no-session-persistence \
+claudex -p --tools "" --no-session-persistence \
   --output-format json 'Reply with exactly CONTEXT_OK' |
   jq '{result, models: (.modelUsage | to_entries | map({model: .key, contextWindow: .value.contextWindow}))}'
 ```
@@ -238,7 +256,7 @@ Require the reported model name to retain `[1m]` and `contextWindow: 1000000` be
 
 ## 8. Modify mappings safely
 
-- To change Claude Code's Fable, Opus, Sonnet, Haiku, or Subagent selection, patch only the corresponding environment variable and the trailing default `--model` when requested. Keep `[1m]` on Claude Code-facing Sol names; keep Terra and Luna unsuffixed unless their upstream context support is separately verified.
+- To change Claude Code's Fable, Opus, Sonnet, Haiku, or Subagent selection, patch only the corresponding environment variable and the trailing default `--model` when requested. This profile uses Fable/Astra Fast by default and Opus/Sol Fast, both with `[1m]` and `xhigh`; keep Terra and Luna unsuffixed unless their upstream context support is separately verified.
 - To expose another client-visible alias, add it under `oauth-model-alias.codex`, keep the canonical upstream name in `name`, and decide explicitly whether `fork` should preserve the original.
 - To attach request behavior to an alias, add a narrowly matched `payload` rule with `protocol: "codex"`.
 - Restart or reload the proxy, refresh the shell, and repeat the model-list plus minimal-request checks after every mapping change.
@@ -248,7 +266,8 @@ Require the reported model name to retain `[1m]` and `contextWindow: 1000000` be
 - **Expired device code:** rerun `--codex-device-login` and use the new code.
 - **401 from the local endpoint:** make the proxy key in Claude Code match one entry under `api-keys`.
 - **Unknown model:** inspect `/v1/models`, confirm the OAuth account exposes the unsuffixed canonical model, and verify the alias is under the `codex` channel. Keep `[1m]` out of the CLIProxyAPI OAuth alias configuration and off Terra/Luna mappings.
-- **Alias replaces the original:** set `fork: true` and restart or reload the proxy.
+- **Alias replaces the original:** set `fork: true` on both Fast aliases and restart or reload the proxy.
+- **Fast route reports the wrong reasoning effort:** confirm both aliases are listed in the `protocol: codex` override rule with `"reasoning.effort": "xhigh"`. Inspect the upstream Responses metadata rather than inferring effort from the model's answer.
 - **Fast request succeeds but reports the standard tier:** the alias routing works, but the upstream did not confirm Priority processing; report that limitation accurately.
 - **Claude Code shows stale mappings:** open a new shell or source the startup file, then restart Claude Code. If Claude Code starts from a GUI or a different shell, configure that launch environment because it may not read `.zshrc`.
 - **Claude Code still reports less than 1M:** confirm both the `[1m]` suffix and `1000000` environment variable are present in the expanded `claudex` alias, start a fresh shell, and repeat the JSON `modelUsage` check.
