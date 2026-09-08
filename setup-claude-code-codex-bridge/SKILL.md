@@ -21,6 +21,7 @@ Bridge a ChatGPT Codex OAuth session into Claude Code through a local CLIProxyAP
 - Request Priority processing for both Fast aliases, but do not override `reasoning.effort`: CC must control it. Remove the old forced `xhigh` rule when upgrading this profile. Do not claim the upstream honored Priority unless response metadata confirms that tier.
 - CC `low`, `medium`, `high`, `xhigh`, and `max` map to the same Codex API values. Codex displays `low` as Light and `xhigh` as Extra High. CC `ultracode` sends `xhigh` plus CC-owned dynamic workflows, not Codex `ultra`; never transmit `ultracode` as an API effort or claim Codex agent orchestration is running.
 - Official Remote Control does not accept a custom `ANTHROPIC_BASE_URL`. Use the reviewed routectl selective-MITM path only when the user asks for official Remote Control; keep Claude's base URL and auth variables unset, keep all three listeners on loopback, and read [references/remote-control.md](references/remote-control.md) before acting.
+- The official phone/web model picker keeps Claude-family labels and may not reliably apply a mapped custom model ID to an existing Remote Control session. Treat Fable and Opus as client labels for the verified Astra and Sol launch mappings, verify the actual route locally, and prefer separately named Astra and Sol sessions for phone-only selection. Do not claim that those sessions share conversation history.
 - Request approval before downloading binaries, opening a browser, changing services outside the user scope, or performing any other action that requires elevated access.
 
 ## Default paths
@@ -274,6 +275,17 @@ ROUTECTL_CONFIG="$HOME/.config/routectl/config.toml" \
 
 The launcher must unset `ANTHROPIC_BASE_URL`, Anthropic key/token variables, provider flags, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`, and fixed effort overrides. It reads the proxy and CA from `routectl rc env` without `eval`, refuses a non-loopback proxy, and scopes all variables to the Claude process.
 
+For reliable phone-side selection, start one named Fable/Astra session and one named Opus/Sol session:
+
+```bash
+scripts/claudex-remote-control "My workstation · Astra"
+scripts/claudex-remote-control "My workstation · Sol" --model opus
+```
+
+Additional Claude arguments follow the launcher's default `--model fable --effort xhigh`, so the later `--model opus` selects the Sol mapping. In the official mobile app, the sessions can still appear as Fable and Opus because those are first-party UI labels. Require the local terminal header and routectl evidence to show `gpt-6-astra-fast[1m]` or `gpt-5.6-sol-fast[1m]`. Do not use a Sonnet or Haiku picker entry as a substitute for either Fast route unless that Remote Control path has been configured and verified separately.
+
+Do not depend on changing a mapped custom model inside an existing phone-controlled session. With prior assistant output, Claude Code asks for local confirmation before `/model` re-reads the full history, and mobile picker changes can be client-scoped or fail to match a custom model ID. Select the separately named session instead. State the tradeoff clearly: the Astra and Sol sessions do not share conversation context.
+
 Do not declare success from an active `/remote-control` banner alone. Send a random exact-response prompt from the official phone or web client, observe the same message and response in the local session, require a new CLIProxyAPI `/v1/messages` request, and confirm routectl selected Astra Fast. Repeat a normal official-base-url CLI request through the same proxy for Opus/Sol Fast at `max`. Claude versions may display the Fast model with or without `[1m]`; require the intended route plus `contextWindow: 1000000`.
 
 ## 9. Modify mappings safely
@@ -296,6 +308,8 @@ Do not declare success from an active `/remote-control` banner alone. Send a ran
 - **Claude Code still reports less than 1M:** confirm both the `[1m]` suffix and `1000000` environment variable are present in the expanded `claudex` alias, start a fresh shell, and repeat the JSON `modelUsage` check.
 - **Remote Control says custom base URL is unsupported:** do not spoof first-party mode or add more auth variables. Stop ordinary `claudex`, verify the routectl service and CA, then use `scripts/claudex-remote-control`; see [references/remote-control.md](references/remote-control.md).
 - **Remote Control starts but inference reaches Anthropic:** verify the Claude child has no custom base/auth variables, the process has routectl's `HTTPS_PROXY` and CA, and the routectl aliases target the local CLIProxy Fast models. Require a CLIProxy request-count increase and routectl model evidence.
+- **The phone shows Fable or Opus instead of Astra or Sol:** this is expected first-party UI labeling, not proof of the upstream route. Verify the named session, terminal model header, and routectl/CLIProxy request evidence.
+- **The phone model picker changes its checkmark but not the route:** stop using that picker for custom IDs. Launch or select the separately named Astra or Sol session; use the local terminal when preserving and switching an existing conversation is mandatory.
 - **Service repeatedly restarts:** inspect `journalctl --user -u cliproxyapi.service`, validate YAML, verify binary permissions, and confirm the auth directory is writable under the service sandbox.
 - **OAuth model list changes:** treat the latest catalog as authoritative and update mappings only to IDs the account currently exposes.
 

@@ -27,7 +27,8 @@ This is a compatibility layer, not a way to make Claude Code accept a custom `AN
 The real Ubuntu E2E on 2026-09-08 used:
 
 - Ubuntu 24.04 x86_64
-- Claude Code 2.1.224 with a Claude Max login
+- Claude Code 2.1.224 with a Claude Max login for the full split-path E2E
+- Claude Code 2.1.263 for the follow-up named Sol Remote Control session
 - CLIProxyAPI 7.2.154
 - routectl commit `39a445f42aa5dee310661299b3fb2a868c472354`
 
@@ -122,6 +123,34 @@ The launcher parses `routectl rc env` without `eval`, refuses a non-loopback pro
 
 The first argument is the Remote Control session name. Additional Claude options are appended after the default `--model fable --effort xhigh`, so an explicit later option can override a launch default when the installed Claude Code supports it.
 
+### Mobile model labels and reliable switching
+
+The official Claude mobile app and `claude.ai/code` own the Remote Control UI. They continue to display their built-in model families instead of routectl's custom Codex model IDs. This is expected: the control plane stays first-party, while the process-scoped proxy changes only the selected inference paths.
+
+| Official client label | Launcher selection | Verified bridge route |
+| --- | --- | --- |
+| Fable, currently shown as `Fable 5.1` | default `--model fable` | `gpt-6-astra-fast[1m]` |
+| Opus, currently shown as `Opus 5` | later `--model opus` | `gpt-5.6-sol-fast[1m]` |
+
+The displayed version text is controlled by Anthropic and can change independently of this repository. Do not use it as route evidence. The phone may also display its own effort wording; require the terminal and captured request to establish the effective model and effort.
+
+Use two named Remote Control sessions when the operator needs to choose Astra or Sol entirely from the phone:
+
+```bash
+scripts/claudex-remote-control "My workstation · Astra"
+scripts/claudex-remote-control "My workstation · Sol" --model opus
+```
+
+Select the desired name from the mobile Code session list. This is the reliable boundary because the launch model is fixed before the session has history. It does not preserve one shared context across the two sessions.
+
+Do not treat the in-session mobile picker as authoritative for custom model IDs. Reported Remote Control behavior includes a picker checkmark that does not change the terminal-side custom model and model changes that are applied only with a subsequent remote-originated message. Claude Code also asks for local confirmation when `/model` changes a conversation that already has assistant output, because the next model must re-read the full uncached history. When a same-context switch is required, perform and confirm it on the local terminal, then verify the next request's route.
+
+References for these boundaries:
+
+- [Claude Code model configuration](https://code.claude.com/docs/en/model-config)
+- [Android Remote Control custom-model picker report](https://github.com/anthropics/claude-code/issues/65373)
+- [Remote picker propagation report](https://github.com/anthropics/claude-code/issues/83472)
+
 ## Verification matrix
 
 | Stage | Contract | Fixture | Assertion | Command | Frequency | Status |
@@ -133,6 +162,7 @@ The first argument is the Remote Control session name. Additional Claude options
 | Fable path | Official URL with no custom auth reaches Astra | Exact short prompt | Exact text, Astra Fast route, managed context 1000000 | `claude -p --model fable ...` with only process-scoped proxy/CA | Deployment | Passed on validated Ubuntu |
 | Opus path | Official URL with no custom auth reaches Sol | Exact short prompt at `max` | Exact text, Sol Fast route, managed context 1000000 | `claude -p --model opus --effort max ...` | Deployment | Passed on validated Ubuntu |
 | Mobile E2E | Official Remote Control operates the local session while inference uses the bridge | Message sent from official mobile client | Phone message and exact response appear locally; CLIProxy request count increases; routectl records Astra Fast | Launcher, then send a random exact-response prompt from phone | Claude/routectl update | Passed on validated Ubuntu |
+| Named Sol session | Phone can select a Sol-specific session without an in-session model change | Launcher with `--model opus`, exact short prompt, mobile sync | Terminal reports Sol Fast, routectl records Sol Fast, exact response appears in the official client | Start the second named launcher session and inspect local route evidence | Claude/routectl update | Passed on Claude Code 2.1.263 |
 
 Claude Code versions may normalize the `modelUsage` key differently. Accept either the Fast name with `[1m]` or without it only when the resolved route is correct and `contextWindow` is exactly `1000000`. This remains client-side managed context, not proof of 1M upstream capacity. Treat Priority as unconfirmed unless returned metadata reports it; the validated requests reported the standard tier.
 

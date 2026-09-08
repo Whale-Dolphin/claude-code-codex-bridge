@@ -72,6 +72,19 @@ This path was validated end to end on Ubuntu with a message sent from the offici
 
 This is security-sensitive because the reviewed local process terminates TLS for `api.anthropic.com` and can see the full-scope Claude session token. All three listeners remain on loopback, the CA is scoped to one Claude process, and prompt/body logging is disabled. Read the pinned source, configuration, rollback steps, security boundary, and full test matrix in [official Remote Control compatibility](setup-claude-code-codex-bridge/references/remote-control.md) before enabling it.
 
+### Mobile model labels and switching
+
+The official Claude mobile app and `claude.ai/code` keep their built-in Claude-family labels; the bridge cannot replace that picker with Codex model names. In the validated profile, a Remote Control session launched as Fable runs `gpt-6-astra-fast[1m]`, while one launched as Opus runs `gpt-5.6-sol-fast[1m]`. The phone can therefore show `Fable 5.1` or `Opus 5` even though routectl and CLIProxyAPI are serving Astra or Sol. Verify the terminal header and routectl/CLIProxy evidence rather than treating the mobile label as the upstream model name.
+
+For reliable phone use, start two explicitly named sessions and select the desired session in the mobile Code list:
+
+```bash
+scripts/claudex-remote-control "My workstation · Astra"
+scripts/claudex-remote-control "My workstation · Sol" --model opus
+```
+
+Do not rely on the in-session mobile model picker for custom model IDs. The official picker may not recognize the mapped ID or may defer a change until a phone-originated message, and `/model` in a conversation with prior output requires a local confirmation before Claude Code re-reads the uncached history. The two-session approach avoids that control-plane ambiguity, but the sessions have separate conversation histories. See the [mobile behavior and verification notes](setup-claude-code-codex-bridge/references/remote-control.md#mobile-model-labels-and-reliable-switching).
+
 ## Install the skill
 
 ```bash
