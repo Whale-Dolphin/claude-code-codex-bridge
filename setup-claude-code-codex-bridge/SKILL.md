@@ -206,7 +206,7 @@ alias claudex='env -u CLAUDE_CODE_USE_BEDROCK \
         CLAUDE_CODE_ALWAYS_ENABLE_EFFORT="1" \
         CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY="3" \
         ENABLE_TOOL_SEARCH="false" \
-        claude --model fable --effort xhigh'
+        claude --model fable --effort xhigh --autocompact 600k'
 ```
 
 Replace the placeholder with the same local proxy key used in `config.yaml`. Preserve every unrelated alias and environment variable in the shell file.
@@ -221,7 +221,7 @@ Use `claudex --effort ultracode` or interactive `/effort ultracode` to keep CC's
 
 Verify in increasing order of cost:
 
-1. Validate shell syntax with `zsh -n ~/.zshrc` and inspect only non-secret fields of the alias or wrapper. Confirm Fable is Astra Fast, Opus is Sol Fast, both end in `[1m]`, and the launcher selects `--model fable --effort xhigh`. Terra and Luna stay unsuffixed, and `CLAUDE_CODE_MAX_CONTEXT_TOKENS=1000000` is scoped to `claudex`.
+1. Validate shell syntax with `zsh -n ~/.zshrc` and inspect only non-secret fields of the alias or wrapper. Confirm Fable is Astra Fast, Opus is Sol Fast, both end in `[1m]`, and the launcher selects `--model fable --effort xhigh --autocompact 600k`. Terra and Luna stay unsuffixed, and `CLAUDE_CODE_MAX_CONTEXT_TOKENS=1000000` is scoped to `claudex`.
 2. Confirm the listener matches the authorized exposure: localhost by default, or the user's explicitly selected network interface and firewall scope.
 3. Query `GET /v1/models` with the local proxy key and confirm these client-visible IDs are present:
    - `gpt-6-astra`

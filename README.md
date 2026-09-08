@@ -9,6 +9,7 @@ A Codex skill for installing, configuring, verifying, and troubleshooting a loca
 - Claude Code `/model` mappings with Fable as the default Astra Fast route and Opus as the Sol Fast route
 - A 1M Claude Code managed context profile for both Fast routes, activated with `[1m]` model suffixes and scoped only to `claudex`
 - An optional official Remote Control launcher that keeps Anthropic's control plane first-party while selectively routing inference through the local bridge
+- A `600K` auto-compaction working window that preserves the `1M` profile while leaving room to summarize before the upstream limit
 - A hardened user-level systemd service
 - End-to-end model-list, normal-route, Fast-route, and shell validation
 
@@ -22,7 +23,7 @@ A Codex skill for installing, configuring, verifying, and troubleshooting a loca
 | Haiku | `gpt-5.6-luna` | Existing provider behavior |
 | Subagent | `gpt-6-astra-fast[1m]` | CC-selected effort / requested Priority |
 
-Each Fast entry is a client-visible alias for its canonical upstream model (`gpt-6-astra` or `gpt-5.6-sol`). Keep `fork: true` so the canonical routes remain available. The bridge overrides only `service_tier: priority` for the two Fast aliases; it must not override `reasoning.effort`. `claudex` launches with `--model fable --effort xhigh`; use `claudex --model opus` or `/model` to select Sol Fast.
+Each Fast entry is a client-visible alias for its canonical upstream model (`gpt-6-astra` or `gpt-5.6-sol`). Keep `fork: true` so the canonical routes remain available. The bridge overrides only `service_tier: priority` for the two Fast aliases; it must not override `reasoning.effort`. `claudex` launches with `--model fable --effort xhigh --autocompact 600k`; use `claudex --model opus` or `/model` to select Sol Fast.
 
 The `[1m]` suffix belongs to the Claude Code-facing names; Terra and Luna remain unsuffixed, and CLIProxyAPI's aliases and canonical IDs remain unsuffixed. The skill reports Priority processing as confirmed only when upstream response metadata confirms it. A successful Fast alias response alone does not establish a Priority grant.
 
@@ -43,15 +44,18 @@ CC sends adaptive thinking with `output_config.effort`; CLIProxyAPI translates i
 
 These are parameter mappings, not equal token/compute budgets across models. See the official [CC effort and ultracode documentation](https://code.claude.com/docs/en/model-config#adjust-effort-level) and [Codex model controls](https://learn.chatgpt.com/docs/models). Legacy fixed `thinking.budget_tokens` is a separate conversion path; use adaptive thinking for five-level alignment.
 
-## 1M context management
+## 1M context profile with 600K auto-compaction
 
 The skill combines Claude Code-facing `[1m]` suffixes on Astra Fast and Sol Fast with this client-side context setting inside the `claudex` alias:
 
 ```zsh
 CLAUDE_CODE_MAX_CONTEXT_TOKENS="1000000"
+claude --model fable --effort xhigh --autocompact 600k
 ```
 
 The suffix activates Claude Code's 1M model profile, while the environment variable makes its managed context ceiling explicit. Together they make Claude Code report and manage a `1000000`-token total context window for `claudex` without changing ordinary `claude` sessions. They do not increase an upstream model limit. The active Codex catalog may report a smaller per-model window; report that discrepancy instead of presenting the client setting as proof of upstream capacity. System instructions, tools, history, output allowance, and compaction leave less than 1M for user-provided files and prompts.
+
+`--autocompact 600k` keeps that 1M profile but tells Claude Code to compact as the working context approaches 600K instead of waiting near the 1M ceiling. It is a safety margin for summary generation and output, not a change to the upstream model's physical context limit, and it does not guarantee compaction at exactly token 600,000. Existing sessions must be restarted or resumed with the flag before the new threshold applies.
 
 ## Verify an installed profile
 
@@ -97,7 +101,7 @@ cp -R claude-code-codex-bridge/setup-claude-code-codex-bridge \
 Restart Codex after installation, then invoke it with:
 
 ```text
-Use $setup-claude-code-codex-bridge to configure Fable as Astra Fast and Opus as Sol Fast with [1m], default to xhigh while following CC effort changes, preserve CC ultracode, and verify both routes.
+Use $setup-claude-code-codex-bridge to configure Fable as Astra Fast and Opus as Sol Fast with [1m], default to xhigh and auto-compact at 600k while following CC effort changes, preserve CC ultracode, and verify both routes.
 ```
 
 ## Security
