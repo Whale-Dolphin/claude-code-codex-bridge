@@ -1,6 +1,6 @@
 ---
 name: setup-claude-code-codex-bridge
-description: "Install, upgrade, configure, and verify a CLIProxyAPI bridge from Codex OAuth to Claude Code. Use for claudex Fable/Astra and Opus/Sol Fast mappings, CC effort alignment and ultracode, [1m] context, login, and service setup."
+description: "Install, upgrade, configure, and verify a CLIProxyAPI bridge from Codex OAuth to Claude Code. Use for claudex Fable/Astra and Opus/Sol Fast mappings, CC effort alignment and ultracode, [1m] context, login, service setup, and official Remote Control compatibility."
 ---
 
 # Setup Claude Code Codex Bridge
@@ -20,6 +20,7 @@ Bridge a ChatGPT Codex OAuth session into Claude Code through a local CLIProxyAP
 - Treat `gpt-6-astra-fast` and `gpt-5.6-sol-fast` as client-visible aliases for `gpt-6-astra` and `gpt-5.6-sol`, respectively, not as separate upstream models.
 - Request Priority processing for both Fast aliases, but do not override `reasoning.effort`: CC must control it. Remove the old forced `xhigh` rule when upgrading this profile. Do not claim the upstream honored Priority unless response metadata confirms that tier.
 - CC `low`, `medium`, `high`, `xhigh`, and `max` map to the same Codex API values. Codex displays `low` as Light and `xhigh` as Extra High. CC `ultracode` sends `xhigh` plus CC-owned dynamic workflows, not Codex `ultra`; never transmit `ultracode` as an API effort or claim Codex agent orchestration is running.
+- Official Remote Control does not accept a custom `ANTHROPIC_BASE_URL`. Use the reviewed routectl selective-MITM path only when the user asks for official Remote Control; keep Claude's base URL and auth variables unset, keep all three listeners on loopback, and read [references/remote-control.md](references/remote-control.md) before acting.
 - Request approval before downloading binaries, opening a browser, changing services outside the user scope, or performing any other action that requires elevated access.
 
 ## Default paths
@@ -258,7 +259,24 @@ claudex -p --tools "" --no-session-persistence \
 
 Require the reported model name to retain `[1m]` and `contextWindow: 1000000` before reporting success. The settings change Claude Code's model profile, management, and auto-compaction ceiling for this invocation; they do not prove that 1M tokens of user files fit in one request or raise a smaller upstream limit. Keep verification prompts small unless the user explicitly requests a costly near-limit test.
 
-## 8. Modify mappings safely
+## 8. Add official Remote Control compatibility when requested
+
+Do not try to launch Remote Control through the ordinary `claudex` alias: its custom base URL makes Claude Code reject the feature. The verified optional path uses routectl as a process-scoped HTTPS proxy. It re-injects only Anthropic inference paths into a loopback router backed by CLIProxyAPI, while Anthropic control-plane traffic remains first-party.
+
+Read [references/remote-control.md](references/remote-control.md) completely before installing routectl or generating its CA. Pin and review the documented source commit, keep CLIProxyAPI on `127.0.0.1:8317`, routectl HTTP on `127.0.0.1:8787`, and routectl MITM on `127.0.0.1:8443`. Leave routectl listener auth off for this single-user loopback path and store the CLIProxy key in a mode-0600 file referenced by `file://`; never embed it in TOML, the launcher, logs, or chat.
+
+Launch with the included script after routectl is healthy:
+
+```bash
+ROUTECTL_CONFIG="$HOME/.config/routectl/config.toml" \
+  scripts/claudex-remote-control "My workstation"
+```
+
+The launcher must unset `ANTHROPIC_BASE_URL`, Anthropic key/token variables, provider flags, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`, and fixed effort overrides. It reads the proxy and CA from `routectl rc env` without `eval`, refuses a non-loopback proxy, and scopes all variables to the Claude process.
+
+Do not declare success from an active `/remote-control` banner alone. Send a random exact-response prompt from the official phone or web client, observe the same message and response in the local session, require a new CLIProxyAPI `/v1/messages` request, and confirm routectl selected Astra Fast. Repeat a normal official-base-url CLI request through the same proxy for Opus/Sol Fast at `max`. Claude versions may display the Fast model with or without `[1m]`; require the intended route plus `contextWindow: 1000000`.
+
+## 9. Modify mappings safely
 
 - To change Claude Code's Fable, Opus, Sonnet, Haiku, or Subagent selection, patch only the corresponding environment variable and the trailing default `--model` when requested. This profile uses Fable/Astra Fast by default and Opus/Sol Fast, both with `[1m]` and CC-selected effort (launch default `xhigh`); keep Terra and Luna unsuffixed unless their upstream context support is separately verified.
 - To expose another client-visible alias, add it under `oauth-model-alias.codex`, keep the canonical upstream name in `name`, and decide explicitly whether `fork` should preserve the original.
@@ -276,6 +294,8 @@ Require the reported model name to retain `[1m]` and `contextWindow: 1000000` be
 - **Fast request succeeds but reports the standard tier:** the alias routing works, but the upstream did not confirm Priority processing; report that limitation accurately.
 - **Claude Code shows stale mappings:** open a new shell or source the startup file, then restart Claude Code. If Claude Code starts from a GUI or a different shell, configure that launch environment because it may not read `.zshrc`.
 - **Claude Code still reports less than 1M:** confirm both the `[1m]` suffix and `1000000` environment variable are present in the expanded `claudex` alias, start a fresh shell, and repeat the JSON `modelUsage` check.
+- **Remote Control says custom base URL is unsupported:** do not spoof first-party mode or add more auth variables. Stop ordinary `claudex`, verify the routectl service and CA, then use `scripts/claudex-remote-control`; see [references/remote-control.md](references/remote-control.md).
+- **Remote Control starts but inference reaches Anthropic:** verify the Claude child has no custom base/auth variables, the process has routectl's `HTTPS_PROXY` and CA, and the routectl aliases target the local CLIProxy Fast models. Require a CLIProxy request-count increase and routectl model evidence.
 - **Service repeatedly restarts:** inspect `journalctl --user -u cliproxyapi.service`, validate YAML, verify binary permissions, and confirm the auth directory is writable under the service sandbox.
 - **OAuth model list changes:** treat the latest catalog as authoritative and update mappings only to IDs the account currently exposes.
 

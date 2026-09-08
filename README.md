@@ -8,6 +8,7 @@ A Codex skill for installing, configuring, verifying, and troubleshooting a loca
 - Separate `gpt-6-astra-fast` and `gpt-5.6-sol-fast` client aliases, each following Claude Code's effort and requesting Priority processing
 - Claude Code `/model` mappings with Fable as the default Astra Fast route and Opus as the Sol Fast route
 - A 1M Claude Code managed context profile for both Fast routes, activated with `[1m]` model suffixes and scoped only to `claudex`
+- An optional official Remote Control launcher that keeps Anthropic's control plane first-party while selectively routing inference through the local bridge
 - A hardened user-level systemd service
 - End-to-end model-list, normal-route, Fast-route, and shell validation
 
@@ -63,6 +64,14 @@ python3 setup-claude-code-codex-bridge/scripts/verify_profile.py \
 
 Repeat with `--effort max` to verify tool use and 1M accounting at the highest native effort. For the full client-wire, upstream-metadata, and E2E test matrix, see [verification](setup-claude-code-codex-bridge/references/verification.md). These are small connectivity/contract checks, not quality benchmarks, near-limit context tests, or proof of upstream Priority processing.
 
+## Official Remote Control
+
+Claude Code rejects official Remote Control when `ANTHROPIC_BASE_URL` is custom. The optional compatibility profile instead leaves Claude's first-party URL and subscription authentication untouched, then uses routectl's loopback-only selective MITM proxy to send only inference paths to CLIProxyAPI. The included launcher removes conflicting base URL, auth, provider, proxy, disabled-traffic, and fixed-effort variables before starting the official Remote Control session.
+
+This path was validated end to end on Ubuntu with a message sent from the official mobile client: the exact response appeared in the local Claude session, the CLIProxyAPI request count increased, and routectl recorded Astra Fast. Opus→Sol Fast at `max` and managed context `1000000` were validated separately through the same official-base-url proxy path.
+
+This is security-sensitive because the reviewed local process terminates TLS for `api.anthropic.com` and can see the full-scope Claude session token. All three listeners remain on loopback, the CA is scoped to one Claude process, and prompt/body logging is disabled. Read the pinned source, configuration, rollback steps, security boundary, and full test matrix in [official Remote Control compatibility](setup-claude-code-codex-bridge/references/remote-control.md) before enabling it.
+
 ## Install the skill
 
 ```bash
@@ -94,8 +103,10 @@ Before publishing changes, stage only the files in this repository and run a sec
     ├── agents/
     │   └── openai.yaml
     ├── references/
+    │   ├── remote-control.md
     │   └── verification.md
     └── scripts/
+        ├── claudex-remote-control
         ├── verify_effort.py
         └── verify_profile.py
 ```
