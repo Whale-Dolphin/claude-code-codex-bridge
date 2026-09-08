@@ -7,8 +7,8 @@ A Codex skill for installing, configuring, verifying, and troubleshooting a loca
 - A localhost-only CLIProxyAPI service backed by Codex OAuth
 - Separate `gpt-6-astra-fast` and `gpt-5.6-sol-fast` client aliases, each following Claude Code's effort and requesting Priority processing
 - Claude Code `/model` mappings with Fable as the default Astra Fast route and Opus as the Sol Fast route
-- A 1M Claude Code managed context profile for both Fast routes, activated with `[1m]` model suffixes and scoped only to `claudex`
-- An optional official Remote Control launcher that keeps Anthropic's control plane first-party while selectively routing inference through the local bridge
+- A 1M Claude Code managed context profile for both Fast routes, activated with `[1m]` model suffixes and scoped to `claudex` and `claudex-direct`
+- A default official Remote Control launcher that keeps Anthropic's control plane first-party while selectively routing inference through the local bridge
 - A `600K` auto-compaction working window that preserves the `1M` profile while leaving room to summarize before the upstream limit
 - A hardened user-level systemd service
 - End-to-end model-list, normal-route, Fast-route, and shell validation
@@ -23,7 +23,7 @@ A Codex skill for installing, configuring, verifying, and troubleshooting a loca
 | Haiku | `gpt-5.6-luna` | Existing provider behavior |
 | Subagent | `gpt-6-astra-fast[1m]` | CC-selected effort / requested Priority |
 
-Each Fast entry is a client-visible alias for its canonical upstream model (`gpt-6-astra` or `gpt-5.6-sol`). Keep `fork: true` so the canonical routes remain available. The bridge overrides only `service_tier: priority` for the two Fast aliases; it must not override `reasoning.effort`. `claudex` launches with `--model fable --effort xhigh --autocompact 600k`; use `claudex --model opus` or `/model` to select Sol Fast.
+Each Fast entry is a client-visible alias for its canonical upstream model (`gpt-6-astra` or `gpt-5.6-sol`). Keep `fork: true` so the canonical routes remain available. The bridge overrides only `service_tier: priority` for the two Fast aliases; it must not override `reasoning.effort`. `claudex` launches official Remote Control through routectl with `--model fable --effort xhigh --autocompact 600k`; use `claudex --model opus` or `/model` to select Sol Fast. Use `claudex-direct` only when a non-Remote-Control fallback is required.
 
 The `[1m]` suffix belongs to the Claude Code-facing names; Terra and Luna remain unsuffixed, and CLIProxyAPI's aliases and canonical IDs remain unsuffixed. The skill reports Priority processing as confirmed only when upstream response metadata confirms it. A successful Fast alias response alone does not establish a Priority grant.
 
@@ -46,14 +46,15 @@ These are parameter mappings, not equal token/compute budgets across models. See
 
 ## 1M context profile with 600K auto-compaction
 
-The skill combines Claude Code-facing `[1m]` suffixes on Astra Fast and Sol Fast with this client-side context setting inside the `claudex` alias:
+The skill combines Claude Code-facing `[1m]` suffixes on Astra Fast and Sol Fast with this client-side context setting inside both launch paths:
 
 ```zsh
 CLAUDE_CODE_MAX_CONTEXT_TOKENS="1000000"
-claude --model fable --effort xhigh --autocompact 600k
+claude --remote-control "Claudex Remote Control" \
+  --model fable --effort xhigh --autocompact 600k
 ```
 
-The suffix activates Claude Code's 1M model profile, while the environment variable makes its managed context ceiling explicit. Together they make Claude Code report and manage a `1000000`-token total context window for `claudex` without changing ordinary `claude` sessions. They do not increase an upstream model limit. The active Codex catalog may report a smaller per-model window; report that discrepancy instead of presenting the client setting as proof of upstream capacity. System instructions, tools, history, output allowance, and compaction leave less than 1M for user-provided files and prompts.
+The suffix activates Claude Code's 1M model profile, while the environment variable makes its managed context ceiling explicit. Together they make Claude Code report and manage a `1000000`-token total context window for `claudex` and `claudex-direct` without changing ordinary `claude` sessions. They do not increase an upstream model limit. The active Codex catalog may report a smaller per-model window; report that discrepancy instead of presenting the client setting as proof of upstream capacity. System instructions, tools, history, output allowance, and compaction leave less than 1M for user-provided files and prompts.
 
 `--autocompact 600k` keeps that 1M profile but tells Claude Code to compact as the working context approaches 600K instead of waiting near the 1M ceiling. It is a safety margin for summary generation and output, not a change to the upstream model's physical context limit, and it does not guarantee compaction at exactly token 600,000. Existing sessions must be restarted or resumed with the flag before the new threshold applies.
 
@@ -68,9 +69,9 @@ python3 setup-claude-code-codex-bridge/scripts/verify_profile.py \
 
 Repeat with `--effort max` to verify tool use and 1M accounting at the highest native effort. For the full client-wire, upstream-metadata, and E2E test matrix, see [verification](setup-claude-code-codex-bridge/references/verification.md). These are small connectivity/contract checks, not quality benchmarks, near-limit context tests, or proof of upstream Priority processing.
 
-## Official Remote Control
+## Default official Remote Control
 
-Claude Code rejects official Remote Control when `ANTHROPIC_BASE_URL` is custom. The optional compatibility profile instead leaves Claude's first-party URL and subscription authentication untouched, then uses routectl's loopback-only selective MITM proxy to send only inference paths to CLIProxyAPI. The included launcher removes conflicting base URL, auth, provider, proxy, disabled-traffic, and fixed-effort variables before starting the official Remote Control session.
+Claude Code rejects official Remote Control when `ANTHROPIC_BASE_URL` is custom. The default `claudex` entrypoint therefore leaves Claude's first-party URL and subscription authentication untouched, then uses routectl's loopback-only selective MITM proxy to send only inference paths to CLIProxyAPI. The included launcher removes conflicting base URL, auth, provider, proxy, disabled-traffic, and fixed-effort variables before starting the official Remote Control session. `claudex-direct` preserves the custom-base-url path as an explicit fallback.
 
 This path was validated end to end on Ubuntu with a message sent from the official mobile client: the exact response appeared in the local Claude session, the CLIProxyAPI request count increased, and routectl recorded Astra Fast. Opus→Sol Fast at `max` and managed context `1000000` were validated separately through the same official-base-url proxy path.
 
@@ -80,7 +81,7 @@ This is security-sensitive because the reviewed local process terminates TLS for
 
 The official Claude mobile app and `claude.ai/code` keep their built-in Claude-family labels; the bridge cannot replace that picker with Codex model names. In the validated profile, a Remote Control session launched as Fable runs `gpt-6-astra-fast[1m]`, while one launched as Opus runs `gpt-5.6-sol-fast[1m]`. The phone can therefore show `Fable 5.1` or `Opus 5` even though routectl and CLIProxyAPI are serving Astra or Sol. Verify the terminal header and routectl/CLIProxy evidence rather than treating the mobile label as the upstream model name.
 
-For reliable phone use, start two explicitly named sessions and select the desired session in the mobile Code list:
+Running `claudex` creates a Remote Control session named `Claudex Remote Control`. For reliable phone-only selection between Astra and Sol, start two explicitly named sessions:
 
 ```bash
 scripts/claudex-remote-control "My workstation · Astra"

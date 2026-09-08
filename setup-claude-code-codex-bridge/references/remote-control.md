@@ -1,6 +1,6 @@
 # Official Remote Control with the Codex bridge
 
-Claude Code disables official Remote Control when `ANTHROPIC_BASE_URL` points at a custom endpoint. The supported bridge profile therefore cannot launch Remote Control with the ordinary `claudex` alias.
+Claude Code disables official Remote Control when `ANTHROPIC_BASE_URL` points at a custom endpoint. The supported bridge profile therefore keeps that direct path under `claudex-direct` and makes the default `claudex` alias invoke the routectl launcher.
 
 The verified compatibility path uses routectl's loopback-only selective MITM proxy. Claude Code still sees `https://api.anthropic.com`: routectl re-injects only `/v1/messages`, `/v1/messages/count_tokens`, and `/v1/models` into its local router, then sends those requests to CLIProxyAPI. Anthropic control-plane requests remain first-party traffic and every other host uses an opaque CONNECT tunnel.
 
@@ -119,9 +119,9 @@ ROUTECTL_CONFIG="$HOME/.config/routectl/config.toml" \
   scripts/claudex-remote-control "My workstation"
 ```
 
-The launcher parses `routectl rc env` without `eval`, refuses a non-loopback proxy, and verifies the generated CA. It explicitly removes custom base URL, API key, provider, global proxy, disabled-traffic, and fixed-effort variables before starting Claude Code. It then scopes routectl's `HTTPS_PROXY`, CA, Fast mappings, and 1M managed-context setting to that one process.
+The launcher parses `routectl rc env` without `eval`, refuses a non-loopback proxy, and verifies the generated CA. It explicitly removes custom base URL, API key, provider, global proxy, disabled-traffic, and fixed-effort variables before starting Claude Code. It then scopes routectl's `HTTPS_PROXY`, CA, Fast mappings, and 1M managed-context setting to that one process and defaults to `--autocompact 600k`.
 
-The first argument is the Remote Control session name. Additional Claude options are appended after the default `--model fable --effort xhigh`, so an explicit later option can override a launch default when the installed Claude Code supports it.
+The first argument is the Remote Control session name. Additional Claude options are appended after the default `--model fable --effort xhigh --autocompact 600k`, so an explicit later option can override a launch default when the installed Claude Code supports it. The shell-level `claudex` alias supplies `Claudex Remote Control` as that first argument before forwarding user arguments.
 
 ### Mobile model labels and reliable switching
 
@@ -170,7 +170,7 @@ Claude Code versions may normalize the `modelUsage` key differently. Accept eith
 
 routectl terminates TLS for `api.anthropic.com` locally, so the process can see Claude requests and the full-scope Claude session token. Use only the reviewed pinned source, keep every listener on loopback, set prompt/body logging controls, and scope the CA through the launcher instead of exporting it in the shell.
 
-To disable the compatibility layer, exit the Remote Control process, stop routectl, and launch ordinary `claude` without the launcher. Removing `[mitm]` and restarting routectl removes the extra listener. The normal `claudex` custom-base-url profile remains independent.
+To disable the compatibility layer, exit the Remote Control process, stop routectl, and launch ordinary `claude` without the launcher. Removing `[mitm]` and restarting routectl removes the extra listener. The `claudex-direct` custom-base-url profile remains available as the independent bridge fallback.
 
 Official references:
 

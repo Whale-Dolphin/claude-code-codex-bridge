@@ -73,4 +73,5 @@ exec env \
     --remote-control "$session_name" \
     --model fable \
     --effort xhigh \
+    --autocompact 600k \
     "$@"

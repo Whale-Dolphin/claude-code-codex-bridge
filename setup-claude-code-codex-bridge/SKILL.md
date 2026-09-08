@@ -14,13 +14,13 @@ Bridge a ChatGPT Codex OAuth session into Claude Code through a local CLIProxyAP
 - Never print, copy into chat, or commit OAuth files, API keys, management secrets, or shell history containing credentials.
 - Bind the proxy to `127.0.0.1` unless the user explicitly authorizes network exposure.
 - Use model IDs returned by the current OAuth catalog. Do not infer access from public model documentation.
-- Inspect the active OAuth catalog before changing context accounting. This profile appends `[1m]` to the Claude Code-facing Astra Fast and Sol Fast names and sets `CLAUDE_CODE_MAX_CONTEXT_TOKENS="1000000"` inside the `claudex` alias only; do not export it globally. Keep Terra and Luna unsuffixed.
+- Inspect the active OAuth catalog before changing context accounting. This profile appends `[1m]` to the Claude Code-facing Astra Fast and Sol Fast names and scopes `CLAUDE_CODE_MAX_CONTEXT_TOKENS="1000000"` to the `claudex` and `claudex-direct` launchers only; do not export it globally. Keep Terra and Luna unsuffixed.
 - Keep CLIProxyAPI's canonical OAuth model names and `/v1/models` entries unsuffixed. The `[1m]` suffix belongs only to Claude Code-facing mappings. If the catalog reports a smaller per-model maximum, report the discrepancy and describe 1M as client-side management rather than proven upstream capacity.
 - Describe 1M as the total managed context window, not 1M of file or prompt input. System instructions, tools, history, output allowance, and compaction consume part of it.
 - Treat `gpt-6-astra-fast` and `gpt-5.6-sol-fast` as client-visible aliases for `gpt-6-astra` and `gpt-5.6-sol`, respectively, not as separate upstream models.
 - Request Priority processing for both Fast aliases, but do not override `reasoning.effort`: CC must control it. Remove the old forced `xhigh` rule when upgrading this profile. Do not claim the upstream honored Priority unless response metadata confirms that tier.
 - CC `low`, `medium`, `high`, `xhigh`, and `max` map to the same Codex API values. Codex displays `low` as Light and `xhigh` as Extra High. CC `ultracode` sends `xhigh` plus CC-owned dynamic workflows, not Codex `ultra`; never transmit `ultracode` as an API effort or claim Codex agent orchestration is running.
-- Official Remote Control does not accept a custom `ANTHROPIC_BASE_URL`. Use the reviewed routectl selective-MITM path only when the user asks for official Remote Control; keep Claude's base URL and auth variables unset, keep all three listeners on loopback, and read [references/remote-control.md](references/remote-control.md) before acting.
+- Official Remote Control does not accept a custom `ANTHROPIC_BASE_URL`. The default `claudex` entrypoint must use the reviewed routectl selective-MITM path; keep the custom-base-url path available only as `claudex-direct`. Keep Claude's base URL and auth variables unset in Remote Control, keep all three listeners on loopback, and read [references/remote-control.md](references/remote-control.md) before acting.
 - The official phone/web model picker keeps Claude-family labels and may not reliably apply a mapped custom model ID to an existing Remote Control session. Treat Fable and Opus as client labels for the verified Astra and Sol launch mappings, verify the actual route locally, and prefer separately named Astra and Sol sessions for phone-only selection. Do not claim that those sessions share conversation history.
 - Request approval before downloading binaries, opening a browser, changing services outside the user scope, or performing any other action that requires elevated access.
 
@@ -179,9 +179,9 @@ If user systemd is unavailable, run the same `ExecStart` command in a supervised
 
 ## 6. Map Claude Code models
 
-Patch one clearly labeled `claudex` block in the active shell startup file. Remove an older copy before adding a replacement so repeated runs stay idempotent.
+Patch one clearly labeled launcher block in the active shell startup file. Remove an older copy before adding a replacement so repeated runs stay idempotent. Keep the custom-base-url bridge as `claudex-direct`, and make `claudex` invoke the installed Remote Control launcher by default.
 
-Before patching, inspect the current Codex OAuth catalog. This profile uses `[1m]` suffixes on Astra Fast and Sol Fast plus `1000000` for Claude Code's client-side managed window. Terra and Luna stay unsuffixed. When the catalog advertises a smaller maximum for a selected model, surface that mismatch and do not claim the settings raise the upstream limit. Keep the variable inline in the alias so `claudex` receives it while ordinary `claude` sessions remain unchanged.
+Before patching, inspect the current Codex OAuth catalog. This profile uses `[1m]` suffixes on Astra Fast and Sol Fast plus `1000000` for Claude Code's client-side managed window. Terra and Luna stay unsuffixed. When the catalog advertises a smaller maximum for a selected model, surface that mismatch and do not claim the settings raise the upstream limit. Keep the variable inside both scoped launchers so ordinary `claude` sessions remain unchanged.
 
 For zsh, use:
 
@@ -189,8 +189,8 @@ For zsh, use:
 # Claude Code /model mapping for the local Codex bridge:
 # Fable (default) = gpt-6-astra-fast[1m], Opus = gpt-5.6-sol-fast[1m]; default effort xhigh.
 # Sonnet = gpt-5.6-terra, Haiku = gpt-5.6-luna.
-unalias claudex 2>/dev/null
-alias claudex='env -u CLAUDE_CODE_USE_BEDROCK \
+unalias claudex claudex-direct 2>/dev/null
+alias claudex-direct='env -u CLAUDE_CODE_USE_BEDROCK \
         -u CLAUDE_CODE_SKIP_BEDROCK_AUTH \
         -u CLAUDE_CODE_USE_VERTEX \
         -u CLAUDE_CODE_USE_FOUNDRY \
@@ -207,11 +207,12 @@ alias claudex='env -u CLAUDE_CODE_USE_BEDROCK \
         CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY="3" \
         ENABLE_TOOL_SEARCH="false" \
         claude --model fable --effort xhigh --autocompact 600k'
+alias claudex='claudex-remote-control "Claudex Remote Control"'
 ```
 
 Replace the placeholder with the same local proxy key used in `config.yaml`. Preserve every unrelated alias and environment variable in the shell file.
 
-The trailing `--model fable` selects the Fable label itself; its environment mapping resolves to Astra Fast. `--effort xhigh` is a launch default, not an upstream override. In an executable wrapper, append user arguments after these defaults so `claudex --effort max` can override them. In a running interactive session use `/effort low`, `/effort medium`, `/effort high`, `/effort xhigh`, or `/effort max`.
+The default `claudex` alias supplies a fixed Remote Control name before forwarding user arguments, so a positional Claude prompt is not mistaken for the session name expected by the launcher. The `claudex-direct` alias retains the old custom-base-url path for non-interactive automation and troubleshooting. Both paths select Fable/Astra Fast, default to `xhigh`, and compact at 600K. In an executable wrapper, append user arguments after these defaults so `claudex --effort max` can override them. In a running interactive session use `/effort low`, `/effort medium`, `/effort high`, `/effort xhigh`, or `/effort max`.
 
 Do not hard-code `CLAUDE_CODE_EFFORT_LEVEL`: it can override session choices and prevent ultracode workflows. If the user already supplies it, report the precedence rather than silently removing their setting. CC should send `thinking.type: adaptive` and `output_config.effort`; do not substitute a fixed `MAX_THINKING_TOKENS` budget for this five-level contract.
 
@@ -221,7 +222,7 @@ Use `claudex --effort ultracode` or interactive `/effort ultracode` to keep CC's
 
 Verify in increasing order of cost:
 
-1. Validate shell syntax with `zsh -n ~/.zshrc` and inspect only non-secret fields of the alias or wrapper. Confirm Fable is Astra Fast, Opus is Sol Fast, both end in `[1m]`, and the launcher selects `--model fable --effort xhigh --autocompact 600k`. Terra and Luna stay unsuffixed, and `CLAUDE_CODE_MAX_CONTEXT_TOKENS=1000000` is scoped to `claudex`.
+1. Validate shell syntax with `zsh -n ~/.zshrc` and inspect only non-secret fields of the aliases or wrapper. Confirm `claudex` invokes `claudex-remote-control`, `claudex-direct` retains the custom-base-url fallback, Fable is Astra Fast, Opus is Sol Fast, both end in `[1m]`, and both launch paths select `--model fable --effort xhigh --autocompact 600k`. Terra and Luna stay unsuffixed, and `CLAUDE_CODE_MAX_CONTEXT_TOKENS=1000000` remains scoped to these launchers.
 2. Confirm the listener matches the authorized exposure: localhost by default, or the user's explicitly selected network interface and firewall scope.
 3. Query `GET /v1/models` with the local proxy key and confirm these client-visible IDs are present:
    - `gpt-6-astra`
@@ -230,9 +231,9 @@ Verify in increasing order of cost:
    - `gpt-5.6-sol-fast`
    - `gpt-5.6-terra`
    - `gpt-5.6-luna`
-4. Send a minimal request through plain `claudex` with no model override and require an exact response plus `gpt-6-astra-fast[1m]` in the JSON model usage. This verifies the default Fable mapping, not just an explicitly selected model ID.
-5. Repeat through `claudex --model opus` and require `gpt-5.6-sol-fast[1m]`. Capture the client's five effort levels and ultracode wire behavior, then send small Responses API requests to both unsuffixed Fast aliases and require the returned canonical model and `reasoning.effort` to match each requested level. Inspect `service_tier` separately and describe Priority as unconfirmed unless returned metadata reports it.
-6. Start `claudex`, run `/model`, and confirm the Fable, Opus, Sonnet, and Haiku entries resolve to their intended IDs.
+4. Send a minimal non-interactive request through `claudex-direct` with no model override and require an exact response plus `gpt-6-astra-fast[1m]` in the JSON model usage. This verifies the default Fable mapping, not just an explicitly selected model ID.
+5. Repeat through `claudex-direct --model opus` and require `gpt-5.6-sol-fast[1m]`. Capture the client's five effort levels and ultracode wire behavior, then send small Responses API requests to both unsuffixed Fast aliases and require the returned canonical model and `reasoning.effort` to match each requested level. Inspect `service_tier` separately and describe Priority as unconfirmed unless returned metadata reports it.
+6. Start `claudex`, confirm the Remote Control banner appears, run `/model`, and confirm the Fable, Opus, Sonnet, and Haiku entries resolve to their intended IDs.
 
 For the default/Opus model, Read tool round-trip, and 1M client-accounting checks, run the included standard-library verifier:
 
@@ -246,34 +247,33 @@ Example minimal checks after loading the shell config:
 
 ```zsh
 source ~/.zshrc
-claudex -p --output-format json 'Reply with exactly ASTRA_FAST_OK'
-claudex -p --model opus --output-format json 'Reply with exactly SOL_FAST_OK'
+claudex-direct -p --output-format json 'Reply with exactly ASTRA_FAST_OK'
+claudex-direct -p --model opus --output-format json 'Reply with exactly SOL_FAST_OK'
 ```
 
 Verify Claude Code's effective accounting with a small JSON request:
 
 ```zsh
-claudex -p --tools "" --no-session-persistence \
+claudex-direct -p --tools "" --no-session-persistence \
   --output-format json 'Reply with exactly CONTEXT_OK' |
   jq '{result, models: (.modelUsage | to_entries | map({model: .key, contextWindow: .value.contextWindow}))}'
 ```
 
 Require the reported model name to retain `[1m]` and `contextWindow: 1000000` before reporting success. The settings change Claude Code's model profile, management, and auto-compaction ceiling for this invocation; they do not prove that 1M tokens of user files fit in one request or raise a smaller upstream limit. Keep verification prompts small unless the user explicitly requests a costly near-limit test.
 
-## 8. Add official Remote Control compatibility when requested
+## 8. Configure the default official Remote Control entrypoint
 
-Do not try to launch Remote Control through the ordinary `claudex` alias: its custom base URL makes Claude Code reject the feature. The verified optional path uses routectl as a process-scoped HTTPS proxy. It re-injects only Anthropic inference paths into a loopback router backed by CLIProxyAPI, while Anthropic control-plane traffic remains first-party.
+Do not add Remote Control to the custom-base-url `claudex-direct` alias: Claude Code rejects that combination. The default `claudex` alias must instead invoke the routectl launcher, which uses a process-scoped HTTPS proxy. It re-injects only Anthropic inference paths into a loopback router backed by CLIProxyAPI, while Anthropic control-plane traffic remains first-party.
 
 Read [references/remote-control.md](references/remote-control.md) completely before installing routectl or generating its CA. Pin and review the documented source commit, keep CLIProxyAPI on `127.0.0.1:8317`, routectl HTTP on `127.0.0.1:8787`, and routectl MITM on `127.0.0.1:8443`. Leave routectl listener auth off for this single-user loopback path and store the CLIProxy key in a mode-0600 file referenced by `file://`; never embed it in TOML, the launcher, logs, or chat.
 
 Launch with the included script after routectl is healthy:
 
 ```bash
-ROUTECTL_CONFIG="$HOME/.config/routectl/config.toml" \
-  scripts/claudex-remote-control "My workstation"
+claudex
 ```
 
-The launcher must unset `ANTHROPIC_BASE_URL`, Anthropic key/token variables, provider flags, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`, and fixed effort overrides. It reads the proxy and CA from `routectl rc env` without `eval`, refuses a non-loopback proxy, and scopes all variables to the Claude process.
+The launcher must unset `ANTHROPIC_BASE_URL`, Anthropic key/token variables, provider flags, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`, and fixed effort overrides. It reads the proxy and CA from `routectl rc env` without `eval`, refuses a non-loopback proxy, scopes all variables to the Claude process, and launches with `--model fable --effort xhigh --autocompact 600k`.
 
 For reliable phone-side selection, start one named Fable/Astra session and one named Opus/Sol session:
 
@@ -282,7 +282,7 @@ scripts/claudex-remote-control "My workstation · Astra"
 scripts/claudex-remote-control "My workstation · Sol" --model opus
 ```
 
-Additional Claude arguments follow the launcher's default `--model fable --effort xhigh`, so the later `--model opus` selects the Sol mapping. In the official mobile app, the sessions can still appear as Fable and Opus because those are first-party UI labels. Require the local terminal header and routectl evidence to show `gpt-6-astra-fast[1m]` or `gpt-5.6-sol-fast[1m]`. Do not use a Sonnet or Haiku picker entry as a substitute for either Fast route unless that Remote Control path has been configured and verified separately.
+Additional Claude arguments follow the launcher's default `--model fable --effort xhigh --autocompact 600k`, so the later `--model opus` selects the Sol mapping. In the official mobile app, the sessions can still appear as Fable and Opus because those are first-party UI labels. Require the local terminal header and routectl evidence to show `gpt-6-astra-fast[1m]` or `gpt-5.6-sol-fast[1m]`. Do not use a Sonnet or Haiku picker entry as a substitute for either Fast route unless that Remote Control path has been configured and verified separately.
 
 Do not depend on changing a mapped custom model inside an existing phone-controlled session. With prior assistant output, Claude Code asks for local confirmation before `/model` re-reads the full history, and mobile picker changes can be client-scoped or fail to match a custom model ID. Select the separately named session instead. State the tradeoff clearly: the Astra and Sol sessions do not share conversation context.
 
@@ -305,8 +305,8 @@ Do not declare success from an active `/remote-control` banner alone. Send a ran
 - **Ultracode only behaves like xhigh:** check the CC version, workflow setting, model capability detection, environment effort override, and activation reminder. Report disabled workflows honestly; do not rewrite the upstream effort to `ultra` as a workaround.
 - **Fast request succeeds but reports the standard tier:** the alias routing works, but the upstream did not confirm Priority processing; report that limitation accurately.
 - **Claude Code shows stale mappings:** open a new shell or source the startup file, then restart Claude Code. If Claude Code starts from a GUI or a different shell, configure that launch environment because it may not read `.zshrc`.
-- **Claude Code still reports less than 1M:** confirm both the `[1m]` suffix and `1000000` environment variable are present in the expanded `claudex` alias, start a fresh shell, and repeat the JSON `modelUsage` check.
-- **Remote Control says custom base URL is unsupported:** do not spoof first-party mode or add more auth variables. Stop ordinary `claudex`, verify the routectl service and CA, then use `scripts/claudex-remote-control`; see [references/remote-control.md](references/remote-control.md).
+- **Claude Code still reports less than 1M:** confirm both the `[1m]` suffix and `1000000` environment variable are present in the selected `claudex` or `claudex-direct` launcher, start a fresh shell, and repeat the JSON `modelUsage` check through `claudex-direct`.
+- **Remote Control says custom base URL is unsupported:** confirm `claudex` resolves to `claudex-remote-control`, not `claudex-direct`. Do not spoof first-party mode or add more auth variables. Verify the routectl service and CA, then relaunch `claudex`; see [references/remote-control.md](references/remote-control.md).
 - **Remote Control starts but inference reaches Anthropic:** verify the Claude child has no custom base/auth variables, the process has routectl's `HTTPS_PROXY` and CA, and the routectl aliases target the local CLIProxy Fast models. Require a CLIProxy request-count increase and routectl model evidence.
 - **The phone shows Fable or Opus instead of Astra or Sol:** this is expected first-party UI labeling, not proof of the upstream route. Verify the named session, terminal model header, and routectl/CLIProxy request evidence.
 - **The phone model picker changes its checkmark but not the route:** stop using that picker for custom IDs. Launch or select the separately named Astra or Sol session; use the local terminal when preserving and switching an existing conversation is mandatory.
