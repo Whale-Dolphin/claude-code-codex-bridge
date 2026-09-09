@@ -18,7 +18,7 @@ def main() -> None:
     wrapper = args.claudex.expanduser().resolve(strict=True)
     effort_args = ['--effort', args.effort] if args.effort else []
     routes = [
-        ('fable-default', [], 'gpt-6-astra-fast[1m]'),
+        ('fable-default', [], 'gpt-6-astra[1m]'),
         ('opus', ['--model', 'opus'], 'gpt-5.6-sol-fast[1m]'),
     ]
     with tempfile.TemporaryDirectory(prefix='claudex-profile-') as workdir:

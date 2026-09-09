@@ -1,4 +1,4 @@
 interface:
   display_name: "Setup Claude Code Codex Bridge"
-  short_description: "Bridge Astra/Sol Fast, 1M, effort, and official Remote Control"
-  default_prompt: "Use $setup-claude-code-codex-bridge to map Fable to Astra Fast and Opus to Sol Fast with [1m], default to xhigh while following CC effort changes, preserve CC ultracode, and configure the optional official Remote Control compatibility path when requested."
+  short_description: "Bridge Astra and Sol Fast, 1M, effort, and Remote Control"
+  default_prompt: "Use $setup-claude-code-codex-bridge to map Fable to standard Astra and Opus to Sol Fast with [1m], default to xhigh and auto-compact at 600k while following CC effort changes, preserve CC ultracode, and configure the official Remote Control path."

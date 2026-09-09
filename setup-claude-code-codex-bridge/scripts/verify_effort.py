@@ -13,7 +13,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 
-ROUTES = {'fable': 'gpt-6-astra-fast', 'opus': 'gpt-5.6-sol-fast'}
+ROUTES = {'fable': 'gpt-6-astra', 'opus': 'gpt-5.6-sol-fast'}
 LEVELS = ('low', 'medium', 'high', 'xhigh', 'max')
 
 

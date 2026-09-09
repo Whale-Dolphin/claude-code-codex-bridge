@@ -1,11 +1,11 @@
 ---
 name: setup-claude-code-codex-bridge
-description: "Install, upgrade, configure, and verify a CLIProxyAPI bridge from Codex OAuth to Claude Code. Use for claudex Fable/Astra and Opus/Sol Fast mappings, CC effort alignment and ultracode, [1m] context, login, service setup, and official Remote Control compatibility."
+description: "Install, upgrade, configure, and verify a CLIProxyAPI bridge from Codex OAuth to Claude Code. Use for claudex Fable/standard Astra and Opus/Sol Fast mappings, CC effort alignment and ultracode, [1m] context, login, service setup, and official Remote Control compatibility."
 ---
 
 # Setup Claude Code Codex Bridge
 
-Bridge a ChatGPT Codex OAuth session into Claude Code through a local CLIProxyAPI server. The profile launches Fable as Astra Fast and maps Opus to Sol Fast, both with `[1m]`. Default to `xhigh` but follow CC effort changes; preserve CC-owned ultracode workflows. Preserve existing configuration and explicitly authorized network exposure, and verify each layer before declaring success.
+Bridge a ChatGPT Codex OAuth session into Claude Code through a local CLIProxyAPI server. The profile launches Fable as standard Astra and maps Opus to Sol Fast, both with `[1m]`. Default to `xhigh` but follow CC effort changes; preserve CC-owned ultracode workflows. Preserve existing configuration and explicitly authorized network exposure, and verify each layer before declaring success.
 
 ## Operating rules
 
@@ -14,14 +14,14 @@ Bridge a ChatGPT Codex OAuth session into Claude Code through a local CLIProxyAP
 - Never print, copy into chat, or commit OAuth files, API keys, management secrets, or shell history containing credentials.
 - Bind the proxy to `127.0.0.1` unless the user explicitly authorizes network exposure.
 - Use model IDs returned by the current OAuth catalog. Do not infer access from public model documentation.
-- Inspect the active OAuth catalog before changing context accounting. This profile appends `[1m]` to the Claude Code-facing Astra Fast and Sol Fast names and scopes `CLAUDE_CODE_MAX_CONTEXT_TOKENS="1000000"` to the `claudex` and `claudex-direct` launchers only; do not export it globally. Keep Terra and Luna unsuffixed.
+- Inspect the active OAuth catalog before changing context accounting. This profile appends `[1m]` to the Claude Code-facing standard Astra and Sol Fast names and scopes `CLAUDE_CODE_MAX_CONTEXT_TOKENS="1000000"` to the `claudex` and `claudex-direct` launchers only; do not export it globally. Keep Terra and Luna unsuffixed.
 - Keep CLIProxyAPI's canonical OAuth model names and `/v1/models` entries unsuffixed. The `[1m]` suffix belongs only to Claude Code-facing mappings. If the catalog reports a smaller per-model maximum, report the discrepancy and describe 1M as client-side management rather than proven upstream capacity.
 - Describe 1M as the total managed context window, not 1M of file or prompt input. System instructions, tools, history, output allowance, and compaction consume part of it.
 - Treat `gpt-6-astra-fast` and `gpt-5.6-sol-fast` as client-visible aliases for `gpt-6-astra` and `gpt-5.6-sol`, respectively, not as separate upstream models.
-- Request Priority processing for both Fast aliases, but do not override `reasoning.effort`: CC must control it. Remove the old forced `xhigh` rule when upgrading this profile. Do not claim the upstream honored Priority unless response metadata confirms that tier.
+- Request Priority processing only for the two explicit Fast aliases, but do not override `reasoning.effort`: CC must control it. Fable uses canonical Astra and therefore does not request Priority. Remove the old forced `xhigh` rule when upgrading this profile. Do not claim the upstream honored Priority unless response metadata confirms that tier.
 - CC `low`, `medium`, `high`, `xhigh`, and `max` map to the same Codex API values. Codex displays `low` as Light and `xhigh` as Extra High. CC `ultracode` sends `xhigh` plus CC-owned dynamic workflows, not Codex `ultra`; never transmit `ultracode` as an API effort or claim Codex agent orchestration is running.
 - Official Remote Control does not accept a custom `ANTHROPIC_BASE_URL`. The default `claudex` entrypoint must use the reviewed routectl selective-MITM path; keep the custom-base-url path available only as `claudex-direct`. Keep Claude's base URL and auth variables unset in Remote Control, keep all three listeners on loopback, and read [references/remote-control.md](references/remote-control.md) before acting.
-- The official phone/web model picker keeps Claude-family labels and may not reliably apply a mapped custom model ID to an existing Remote Control session. Treat Fable and Opus as client labels for the verified Astra and Sol launch mappings, verify the actual route locally, and prefer separately named Astra and Sol sessions for phone-only selection. Do not claim that those sessions share conversation history.
+- The official phone/web model picker keeps Claude-family labels and may not reliably apply a mapped custom model ID to an existing Remote Control session. Treat Fable and Opus as client labels for the configured Astra and Sol launch mappings, verify the actual route locally, and prefer separately named Astra and Sol sessions for phone-only selection. Do not claim that those sessions share conversation history.
 - Request approval before downloading binaries, opening a browser, changing services outside the user scope, or performing any other action that requires elevated access.
 
 ## Default paths
@@ -181,13 +181,13 @@ If user systemd is unavailable, run the same `ExecStart` command in a supervised
 
 Patch one clearly labeled launcher block in the active shell startup file. Remove an older copy before adding a replacement so repeated runs stay idempotent. Keep the custom-base-url bridge as `claudex-direct`, and make `claudex` invoke the installed Remote Control launcher by default.
 
-Before patching, inspect the current Codex OAuth catalog. This profile uses `[1m]` suffixes on Astra Fast and Sol Fast plus `1000000` for Claude Code's client-side managed window. Terra and Luna stay unsuffixed. When the catalog advertises a smaller maximum for a selected model, surface that mismatch and do not claim the settings raise the upstream limit. Keep the variable inside both scoped launchers so ordinary `claude` sessions remain unchanged.
+Before patching, inspect the current Codex OAuth catalog. This profile uses `[1m]` suffixes on standard Astra and Sol Fast plus `1000000` for Claude Code's client-side managed window. Terra and Luna stay unsuffixed. When the catalog advertises a smaller maximum for a selected model, surface that mismatch and do not claim the settings raise the upstream limit. Keep the variable inside both scoped launchers so ordinary `claude` sessions remain unchanged.
 
 For zsh, use:
 
 ```zsh
 # Claude Code /model mapping for the local Codex bridge:
-# Fable (default) = gpt-6-astra-fast[1m], Opus = gpt-5.6-sol-fast[1m]; default effort xhigh.
+# Fable (default) = gpt-6-astra[1m], Opus = gpt-5.6-sol-fast[1m]; default effort xhigh.
 # Sonnet = gpt-5.6-terra, Haiku = gpt-5.6-luna.
 unalias claudex claudex-direct 2>/dev/null
 alias claudex-direct='env -u CLAUDE_CODE_USE_BEDROCK \
@@ -197,11 +197,11 @@ alias claudex-direct='env -u CLAUDE_CODE_USE_BEDROCK \
         ANTHROPIC_BASE_URL="http://127.0.0.1:8317" \
         ANTHROPIC_AUTH_TOKEN="<random-local-proxy-key>" \
         ANTHROPIC_API_KEY="" \
-        ANTHROPIC_DEFAULT_FABLE_MODEL="gpt-6-astra-fast[1m]" \
+        ANTHROPIC_DEFAULT_FABLE_MODEL="gpt-6-astra[1m]" \
         ANTHROPIC_DEFAULT_OPUS_MODEL="gpt-5.6-sol-fast[1m]" \
         ANTHROPIC_DEFAULT_SONNET_MODEL="gpt-5.6-terra" \
         ANTHROPIC_DEFAULT_HAIKU_MODEL="gpt-5.6-luna" \
-        CLAUDE_CODE_SUBAGENT_MODEL="gpt-6-astra-fast[1m]" \
+        CLAUDE_CODE_SUBAGENT_MODEL="gpt-6-astra[1m]" \
         CLAUDE_CODE_MAX_CONTEXT_TOKENS="1000000" \
         CLAUDE_CODE_ALWAYS_ENABLE_EFFORT="1" \
         CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY="3" \
@@ -212,7 +212,7 @@ alias claudex='claudex-remote-control "Claudex Remote Control"'
 
 Replace the placeholder with the same local proxy key used in `config.yaml`. Preserve every unrelated alias and environment variable in the shell file.
 
-The default `claudex` alias supplies a fixed Remote Control name before forwarding user arguments, so a positional Claude prompt is not mistaken for the session name expected by the launcher. The `claudex-direct` alias retains the old custom-base-url path for non-interactive automation and troubleshooting. Both paths select Fable/Astra Fast, default to `xhigh`, and compact at 600K. In an executable wrapper, append user arguments after these defaults so `claudex --effort max` can override them. In a running interactive session use `/effort low`, `/effort medium`, `/effort high`, `/effort xhigh`, or `/effort max`.
+The default `claudex` alias supplies a fixed Remote Control name before forwarding user arguments, so a positional Claude prompt is not mistaken for the session name expected by the launcher. The `claudex-direct` alias retains the custom-base-url path for non-interactive automation and troubleshooting. Both paths select Fable/canonical Astra without the Fast/Priority alias, default to `xhigh`, and compact at 600K. In an executable wrapper, append user arguments after these defaults so `claudex --effort max` can override them. In a running interactive session use `/effort low`, `/effort medium`, `/effort high`, `/effort xhigh`, or `/effort max`.
 
 Do not hard-code `CLAUDE_CODE_EFFORT_LEVEL`: it can override session choices and prevent ultracode workflows. If the user already supplies it, report the precedence rather than silently removing their setting. CC should send `thinking.type: adaptive` and `output_config.effort`; do not substitute a fixed `MAX_THINKING_TOKENS` budget for this five-level contract.
 
@@ -222,7 +222,7 @@ Use `claudex --effort ultracode` or interactive `/effort ultracode` to keep CC's
 
 Verify in increasing order of cost:
 
-1. Validate shell syntax with `zsh -n ~/.zshrc` and inspect only non-secret fields of the aliases or wrapper. Confirm `claudex` invokes `claudex-remote-control`, `claudex-direct` retains the custom-base-url fallback, Fable is Astra Fast, Opus is Sol Fast, both end in `[1m]`, and both launch paths select `--model fable --effort xhigh --autocompact 600k`. Terra and Luna stay unsuffixed, and `CLAUDE_CODE_MAX_CONTEXT_TOKENS=1000000` remains scoped to these launchers.
+1. Validate shell syntax with `zsh -n ~/.zshrc` and inspect only non-secret fields of the aliases or wrapper. Confirm `claudex` invokes `claudex-remote-control`, `claudex-direct` retains the custom-base-url fallback, Fable is standard Astra, Opus is Sol Fast, both end in `[1m]`, and both launch paths select `--model fable --effort xhigh --autocompact 600k`. Terra and Luna stay unsuffixed, and `CLAUDE_CODE_MAX_CONTEXT_TOKENS=1000000` remains scoped to these launchers.
 2. Confirm the listener matches the authorized exposure: localhost by default, or the user's explicitly selected network interface and firewall scope.
 3. Query `GET /v1/models` with the local proxy key and confirm these client-visible IDs are present:
    - `gpt-6-astra`
@@ -231,8 +231,8 @@ Verify in increasing order of cost:
    - `gpt-5.6-sol-fast`
    - `gpt-5.6-terra`
    - `gpt-5.6-luna`
-4. Send a minimal non-interactive request through `claudex-direct` with no model override and require an exact response plus `gpt-6-astra-fast[1m]` in the JSON model usage. This verifies the default Fable mapping, not just an explicitly selected model ID.
-5. Repeat through `claudex-direct --model opus` and require `gpt-5.6-sol-fast[1m]`. Capture the client's five effort levels and ultracode wire behavior, then send small Responses API requests to both unsuffixed Fast aliases and require the returned canonical model and `reasoning.effort` to match each requested level. Inspect `service_tier` separately and describe Priority as unconfirmed unless returned metadata reports it.
+4. Send a minimal non-interactive request through `claudex-direct` with no model override and require an exact response plus `gpt-6-astra[1m]` in the JSON model usage. This verifies the default Fable mapping, not just an explicitly selected model ID.
+5. Repeat through `claudex-direct --model opus` and require `gpt-5.6-sol-fast[1m]`. Capture the client's five effort levels and ultracode wire behavior, then send small Responses API requests to canonical `gpt-6-astra` and the unsuffixed `gpt-5.6-sol-fast` alias. Require the returned canonical model and `reasoning.effort` to match each requested level. Inspect `service_tier` separately and describe Priority for Sol Fast as unconfirmed unless returned metadata reports it.
 6. Start `claudex`, confirm the Remote Control banner appears, run `/model`, and confirm the Fable, Opus, Sonnet, and Haiku entries resolve to their intended IDs.
 
 For the default/Opus model, Read tool round-trip, and 1M client-accounting checks, run the included standard-library verifier:
@@ -247,7 +247,7 @@ Example minimal checks after loading the shell config:
 
 ```zsh
 source ~/.zshrc
-claudex-direct -p --output-format json 'Reply with exactly ASTRA_FAST_OK'
+claudex-direct -p --output-format json 'Reply with exactly ASTRA_STANDARD_OK'
 claudex-direct -p --model opus --output-format json 'Reply with exactly SOL_FAST_OK'
 ```
 
@@ -282,15 +282,15 @@ scripts/claudex-remote-control "My workstation · Astra"
 scripts/claudex-remote-control "My workstation · Sol" --model opus
 ```
 
-Additional Claude arguments follow the launcher's default `--model fable --effort xhigh --autocompact 600k`, so the later `--model opus` selects the Sol mapping. In the official mobile app, the sessions can still appear as Fable and Opus because those are first-party UI labels. Require the local terminal header and routectl evidence to show `gpt-6-astra-fast[1m]` or `gpt-5.6-sol-fast[1m]`. Do not use a Sonnet or Haiku picker entry as a substitute for either Fast route unless that Remote Control path has been configured and verified separately.
+Additional Claude arguments follow the launcher's default `--model fable --effort xhigh --autocompact 600k`, so the later `--model opus` selects the Sol mapping. In the official mobile app, the sessions can still appear as Fable and Opus because those are first-party UI labels. Require the local terminal header and routectl evidence to show `gpt-6-astra[1m]` or `gpt-5.6-sol-fast[1m]`. Do not use a Sonnet or Haiku picker entry as a substitute for either route unless that Remote Control path has been configured and verified separately.
 
 Do not depend on changing a mapped custom model inside an existing phone-controlled session. With prior assistant output, Claude Code asks for local confirmation before `/model` re-reads the full history, and mobile picker changes can be client-scoped or fail to match a custom model ID. Select the separately named session instead. State the tradeoff clearly: the Astra and Sol sessions do not share conversation context.
 
-Do not declare success from an active `/remote-control` banner alone. Send a random exact-response prompt from the official phone or web client, observe the same message and response in the local session, require a new CLIProxyAPI `/v1/messages` request, and confirm routectl selected Astra Fast. Repeat a normal official-base-url CLI request through the same proxy for Opus/Sol Fast at `max`. Claude versions may display the Fast model with or without `[1m]`; require the intended route plus `contextWindow: 1000000`.
+Do not declare success from an active `/remote-control` banner alone. Send a random exact-response prompt from the official phone or web client, observe the same message and response in the local session, require a new CLIProxyAPI `/v1/messages` request, and confirm routectl selected standard Astra. Repeat a normal official-base-url CLI request through the same proxy for Opus/Sol Fast at `max`. Claude versions may display the selected model with or without `[1m]`; require the intended route plus `contextWindow: 1000000`.
 
 ## 9. Modify mappings safely
 
-- To change Claude Code's Fable, Opus, Sonnet, Haiku, or Subagent selection, patch only the corresponding environment variable and the trailing default `--model` when requested. This profile uses Fable/Astra Fast by default and Opus/Sol Fast, both with `[1m]` and CC-selected effort (launch default `xhigh`); keep Terra and Luna unsuffixed unless their upstream context support is separately verified.
+- To change Claude Code's Fable, Opus, Sonnet, Haiku, or Subagent selection, patch only the corresponding environment variable and the trailing default `--model` when requested. This profile uses Fable/standard Astra by default and Opus/Sol Fast, both with `[1m]` and CC-selected effort (launch default `xhigh`); keep Terra and Luna unsuffixed unless their upstream context support is separately verified.
 - To expose another client-visible alias, add it under `oauth-model-alias.codex`, keep the canonical upstream name in `name`, and decide explicitly whether `fork` should preserve the original.
 - To attach request behavior to an alias, add a narrowly matched `payload` rule with `protocol: "codex"`.
 - Restart or reload the proxy, refresh the shell, and repeat the model-list plus minimal-request checks after every mapping change.
