@@ -1,18 +1,18 @@
 ---
 name: setup-claude-code-codex-bridge
-description: "Install, upgrade, configure, and verify a CLIProxyAPI bridge from Codex OAuth to Claude Code. Use for claudex Fable/standard Astra, Opus/Sol standard plus native /fast routing, CC effort alignment and ultracode, [1m] context, login, service setup, and official Remote Control compatibility."
+description: "Install, upgrade, configure, and verify a CLIProxyAPI bridge from Codex OAuth to Claude Code in proxy-only, client-only, or all mode. Use for local or external claudex proxy selection, Fable/standard Astra, Opus/Sol standard plus native /fast routing, CC effort alignment and ultracode, [1m] context, login, service setup, and official Remote Control compatibility."
 ---
 
 # Setup Claude Code Codex Bridge
 
-Bridge a ChatGPT Codex OAuth session into Claude Code through a local CLIProxyAPI server. The profile launches Fable as standard Astra, maps Opus standard mode to Sol, and maps Claude Code's native `/fast` signal to Codex Priority on Sol. Both client-facing routes use `[1m]`. Default to `xhigh` but follow CC effort changes; preserve CC-owned ultracode workflows. Preserve existing configuration and explicitly authorized network exposure, and verify each layer before declaring success.
+Install the proxy component, the Claude Code client component, or both. A client can use CLIProxyAPI on the same machine or an existing external machine. The client profile launches Fable as standard Astra, maps Opus standard mode to Sol, and maps Claude Code's native `/fast` signal to Codex Priority on Sol. Both client-facing routes use `[1m]`. Default to `xhigh` but follow CC effort changes; preserve CC-owned ultracode workflows. Preserve existing configuration and explicitly authorized network exposure, and verify each selected layer before declaring success.
 
 ## Operating rules
 
 - Inspect the host before changing it. Reuse a working install, config, auth directory, service, and shell block when present.
 - Preserve unrelated user changes. Back up an existing config before restructuring it, and patch only the relevant shell block.
 - Never print, copy into chat, or commit OAuth files, API keys, management secrets, or shell history containing credentials.
-- Bind the proxy to `127.0.0.1` unless the user explicitly authorizes network exposure.
+- Bind a locally installed proxy to `127.0.0.1` unless the user explicitly authorizes exact network exposure.
 - Use model IDs returned by the current OAuth catalog. Do not infer access from public model documentation.
 - Inspect the active OAuth catalog before changing context accounting. This profile appends `[1m]` to the Claude Code-facing standard Astra and Opus 5 identities and scopes `CLAUDE_CODE_MAX_CONTEXT_TOKENS="1000000"` to the `claudex` and `claudex-direct` launchers only; do not export it globally. Keep Terra and Luna unsuffixed.
 - Keep CLIProxyAPI's canonical OAuth model names and `/v1/models` entries unsuffixed. The `[1m]` suffix belongs only to Claude Code-facing mappings. If the catalog reports a smaller per-model maximum, report the discrepancy and describe 1M as client-side management rather than proven upstream capacity.
@@ -22,7 +22,7 @@ Bridge a ChatGPT Codex OAuth session into Claude Code through a local CLIProxyAP
 - Request Priority processing for the explicit Astra Fast alias and for Sol only when Claude Code sends `speed: "fast"`, but do not override `reasoning.effort`: CC must control it. Fable uses standard Astra by default. CLIProxyAPI v7.2.152 and later translate that speed field to `service_tier: "priority"`. Do not claim the upstream honored Priority unless response metadata confirms that tier.
 - Supply `fastModePerSessionOptIn: true` in the two `claudex` launch paths so each new bridge session starts with native Fast off. Users can still toggle it with `/fast on` and `/fast off`.
 - CC `low`, `medium`, `high`, `xhigh`, and `max` map to the same Codex API values. Codex displays `low` as Light and `xhigh` as Extra High. CC `ultracode` sends `xhigh` plus CC-owned dynamic workflows, not Codex `ultra`; never transmit `ultracode` as an API effort or claim Codex agent orchestration is running.
-- Official Remote Control does not accept a custom `ANTHROPIC_BASE_URL`. The default `claudex` entrypoint must use the reviewed routectl selective-MITM path; keep the custom-base-url path available only as `claudex-direct`. Keep Claude's base URL and auth variables unset in Remote Control, keep all three listeners on loopback, and read [references/remote-control.md](references/remote-control.md) before acting.
+- Official Remote Control does not accept a custom `ANTHROPIC_BASE_URL`. The default `claudex` entrypoint must use the reviewed routectl selective-MITM path; keep the custom-base-url path available only as `claudex-direct`. Keep Claude's base URL and auth variables unset in Remote Control, keep routectl's listeners on loopback, and read [references/remote-control.md](references/remote-control.md) before acting.
 - The official phone/web model picker keeps Claude-family labels and may not reliably apply a mapped custom model ID to an existing Remote Control session. Treat Fable and Opus as client labels for the configured Astra and Sol launch mappings, verify the actual route locally, and prefer separately named Astra and Sol sessions for phone-only selection. Do not claim that those sessions share conversation history.
 - Request approval before downloading binaries, opening a browser, changing services outside the user scope, or performing any other action that requires elevated access.
 
@@ -31,6 +31,10 @@ Bridge a ChatGPT Codex OAuth session into Claude Code through a local CLIProxyAP
 Use these paths unless the user already has a different layout:
 
 ```text
+~/.config/claudex/proxy-url       selected proxy base URL, without /v1
+~/.config/claudex/proxy.key       selected proxy key, mode 0600
+~/.local/bin/claudex-direct       custom-base-url client launcher
+~/.local/bin/claudex-remote-control
 ~/cliproxyapi/cli-proxy-api       active binary
 ~/cliproxyapi/<version>/          extracted version for rollback
 ~/cliproxyapi/config.yaml         active configuration
@@ -39,23 +43,36 @@ Use these paths unless the user already has a different layout:
 ~/.zshrc                          Claude Code alias on zsh
 ```
 
-## 1. Discover the current state
+## 1. Choose the mode and discover the current state
 
-Run read-only checks first:
+Before changing anything, ask the user to choose exactly one mode:
+
+- `proxy-only`: install or update CLIProxyAPI and its Codex OAuth service on this machine; do not install Claude Code launchers.
+- `client-only`: install or update only the local `claudex` client profile and point it at an existing external proxy.
+- `all`: install or update both components and point `claudex` at the local proxy.
+
+If the user already chose a mode, use it without asking again. For `client-only`, ask for the external base URL and obtain its key through a protected key file or hidden local terminal entry; never ask the user to paste a key into chat. Read [references/install-modes.md](references/install-modes.md) completely before making changes, and run only the sections that apply to the selected mode.
+
+Run the relevant read-only checks first:
 
 ```bash
 uname -s
 uname -m
 command -v claude
 claude --version
+test -f "$HOME/.config/claudex/proxy-url" && cat "$HOME/.config/claudex/proxy-url"
+test -f "$HOME/.config/claudex/proxy.key" && stat "$HOME/.config/claudex/proxy.key"
+test -x "$HOME/.local/bin/claudex-direct" && head -n 1 "$HOME/.local/bin/claudex-direct"
 test -x "$HOME/cliproxyapi/cli-proxy-api" && "$HOME/cliproxyapi/cli-proxy-api" --help
 test -f "$HOME/cliproxyapi/config.yaml" && rg -n '^(host|port|auth-dir|oauth-model-alias|payload):' "$HOME/cliproxyapi/config.yaml"
 rg -n -C 4 'alias claudex|ANTHROPIC_DEFAULT_(FABLE|OPUS|SONNET|HAIKU)_MODEL' "$HOME/.zshrc" 2>/dev/null
 ```
 
-Locate any user service with `rg --files ~/.config/systemd/user`. Check service status and logs when a user systemd bus is available. Do not assume a failed `systemctl --user` call means the proxy itself is broken; restricted shells and containers may not expose the user bus.
+Do not run the client launcher during discovery if doing so would send a request; inspect its path and source instead. Never read or print `proxy.key`. For `proxy-only` or `all`, locate any user service with `rg --files ~/.config/systemd/user`. Check service status and logs when a user systemd bus is available. Do not assume a failed `systemctl --user` call means the proxy itself is broken; restricted shells and containers may not expose the user bus.
 
-## 2. Install or upgrade CLIProxyAPI
+## 2. Install or upgrade CLIProxyAPI (`proxy-only` and `all`)
+
+Skip sections 2 through 5 in `client-only` mode.
 
 Use the official `router-for-me/CLIProxyAPI` release matching the host OS and architecture:
 
@@ -74,9 +91,9 @@ Keep rollback possible:
 
 Do not pipe an unreviewed third-party installer directly into a shell. Prefer the official release archive and inspect its asset name first.
 
-## 3. Configure the local bridge
+## 3. Configure the local bridge (`proxy-only` and `all`)
 
-Generate a random local proxy key and keep it consistent between `config.yaml` and the Claude Code alias. Do not reuse a real provider credential.
+Generate a random local proxy key and keep it consistent between `config.yaml` and the client profile when using `all`. Do not reuse a real provider credential.
 
 Create or merge the following fields into `~/cliproxyapi/config.yaml`:
 
@@ -130,7 +147,7 @@ Keep `fork: true` so Astra and Sol remain available under their canonical IDs. T
 
 Validate the YAML with an available parser before restarting. Never print the unredacted file in tool output.
 
-## 4. Connect the Codex OAuth account
+## 4. Connect the Codex OAuth account (`proxy-only` and `all`)
 
 Create the auth directory with user-only permissions, then start device login:
 
@@ -144,7 +161,7 @@ Give the user the displayed verification URL and device code. Wait for confirmat
 
 Verify only that a Codex auth file exists and has restrictive permissions. Do not read its contents into the conversation.
 
-## 5. Run the proxy as a user service
+## 5. Run the proxy as a user service (`proxy-only` and `all`)
 
 On Linux with user systemd, create `~/.config/systemd/user/cliproxyapi.service`:
 
@@ -182,48 +199,36 @@ systemctl --user status cliproxyapi.service --no-pager
 
 If user systemd is unavailable, run the same `ExecStart` command in a supervised terminal or another user-level process manager. Do not silently fall back to a root service.
 
-## 6. Map Claude Code models
+## 6. Install the Claude Code client (`client-only` and `all`)
 
-Patch one clearly labeled launcher block in the active shell startup file. Remove an older copy before adding a replacement so repeated runs stay idempotent. Keep the custom-base-url bridge as `claudex-direct`, and make `claudex` invoke the installed Remote Control launcher by default.
+Skip sections 6 and 8 in `proxy-only` mode. In `client-only`, collect the external proxy URL and key as described in [references/install-modes.md](references/install-modes.md). In `all`, use `http://127.0.0.1:8317` and the same key accepted by the local CLIProxyAPI service.
 
-Before patching, inspect the current Codex OAuth catalog. This profile uses `[1m]` suffixes on standard Astra and the Claude-recognized Opus 5 identity plus `1000000` for Claude Code's client-side managed window. Terra and Luna stay unsuffixed. When the catalog advertises a smaller maximum for a selected model, surface that mismatch and do not claim the settings raise the upstream limit. Keep the variable inside both scoped launchers so ordinary `claude` sessions remain unchanged.
+Install the included launchers and create the shared client profile:
 
-For zsh, use:
+```bash
+install -d -m 0700 "$HOME/.config/claudex" "$HOME/.local/bin"
+install -m 0755 scripts/claudex-direct "$HOME/.local/bin/claudex-direct"
+install -m 0755 scripts/claudex-remote-control "$HOME/.local/bin/claudex-remote-control"
+printf '%s\n' '<proxy-base-url>' > "$HOME/.config/claudex/proxy-url"
+chmod 0600 "$HOME/.config/claudex/proxy-url"
+```
+
+Provision `proxy.key` directly from the protected source or a hidden local prompt, then apply mode `0600`; do not place the key in chat, command-line arguments, or shell history. The direct launcher reads these two files at startup and rejects an empty or multiline key. For a non-loopback HTTP endpoint, apply the explicit security decision required by the mode reference.
+
+Before patching the shell, inspect the selected proxy's live model catalog. This profile uses `[1m]` suffixes on standard Astra and the Claude-recognized Opus 5 identity plus `1000000` for Claude Code's client-side managed window. Terra and Luna stay unsuffixed. When the catalog advertises a smaller maximum for a selected model, surface that mismatch and do not claim the settings raise the upstream limit. The variables remain inside both scoped launchers so ordinary `claude` sessions are unchanged.
+
+Patch one clearly labeled block in the active shell startup file. Remove an older copy before adding a replacement so repeated runs stay idempotent. Preserve every unrelated alias and environment variable. For zsh, use:
 
 ```zsh
-# Claude Code /model mapping for the local Codex bridge:
-# Fable (default) = gpt-6-astra[1m]. Opus client identity = claude-opus-5[1m],
-# routed to standard gpt-5.6-sol; Claude native /fast requests Sol Priority.
-# Sonnet = gpt-5.6-terra, Haiku = gpt-5.6-luna.
+# Claude Code /model mapping for the selected Codex bridge.
 unalias claudex claudex-direct 2>/dev/null
-alias claudex-direct='env -u CLAUDE_CODE_DISABLE_FAST_MODE \
-        -u CLAUDE_CODE_USE_BEDROCK \
-        -u CLAUDE_CODE_SKIP_BEDROCK_AUTH \
-        -u CLAUDE_CODE_USE_VERTEX \
-        -u CLAUDE_CODE_USE_FOUNDRY \
-        ANTHROPIC_BASE_URL="http://127.0.0.1:8317" \
-        ANTHROPIC_AUTH_TOKEN="<random-local-proxy-key>" \
-        ANTHROPIC_API_KEY="" \
-        ANTHROPIC_DEFAULT_FABLE_MODEL="gpt-6-astra[1m]" \
-        ANTHROPIC_DEFAULT_OPUS_MODEL="claude-opus-5[1m]" \
-        ANTHROPIC_DEFAULT_SONNET_MODEL="gpt-5.6-terra" \
-        ANTHROPIC_DEFAULT_HAIKU_MODEL="gpt-5.6-luna" \
-        CLAUDE_CODE_SUBAGENT_MODEL="gpt-6-astra[1m]" \
-        CLAUDE_CODE_MAX_CONTEXT_TOKENS="1000000" \
-        CLAUDE_CODE_SKIP_FAST_MODE_ORG_CHECK="1" \
-        CLAUDE_CODE_ALWAYS_ENABLE_EFFORT="1" \
-        CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY="3" \
-        ENABLE_TOOL_SEARCH="false" \
-        claude --model fable --effort xhigh --autocompact 600k \
-        --settings "{\"fastModePerSessionOptIn\":true}"'
+alias claudex-direct="$HOME/.local/bin/claudex-direct"
 alias claudex='claudex-remote-control "Claudex Remote Control"'
 ```
 
-Replace the placeholder with the same local proxy key used in `config.yaml`. Preserve every unrelated alias and environment variable in the shell file.
+The default `claudex` alias supplies a fixed Remote Control name before forwarding user arguments, so a positional Claude prompt is not mistaken for the session name expected by the launcher. The `claudex-direct` launcher retains the custom-base-url path for non-interactive automation and troubleshooting. Both executable launchers select Fable/standard Astra, default to `xhigh`, compact at 600K, and reset native Fast to off for each new session. `/fast on` switches a Fable session to the configured Opus identity and requests Priority on Sol; `/fast off` remains on Opus/Sol but returns to the standard tier. They append user arguments after these defaults so later options can override launch defaults.
 
-The default `claudex` alias supplies a fixed Remote Control name before forwarding user arguments, so a positional Claude prompt is not mistaken for the session name expected by the launcher. The `claudex-direct` alias retains the custom-base-url path for non-interactive automation and troubleshooting. Both paths select Fable/standard Astra, default to `xhigh`, compact at 600K, and reset native Fast to off for each new session. `/fast on` switches a Fable session to the configured Opus identity and requests Priority on Sol; `/fast off` remains on Opus/Sol but returns to the standard tier. In an executable wrapper, append user arguments after these defaults so later options can override launch defaults.
-
-Do not hard-code `CLAUDE_CODE_EFFORT_LEVEL`: it can override session choices and prevent ultracode workflows. If the user already supplies it, report the precedence rather than silently removing their setting. CC should send `thinking.type: adaptive` and `output_config.effort`; do not substitute a fixed `MAX_THINKING_TOKENS` budget for this five-level contract.
+Do not hard-code `CLAUDE_CODE_EFFORT_LEVEL`: it can override session choices and prevent ultracode workflows. Report an inherited global value, then rely on the scoped launchers to remove it so their explicit CLI defaults and overrides remain authoritative. CC should send `thinking.type: adaptive` and `output_config.effort`; do not substitute a fixed `MAX_THINKING_TOKENS` budget for this five-level contract.
 
 Use `claudex --effort ultracode` or interactive `/effort ultracode` to keep CC's native `xhigh` plus workflow mode (requires CC 2.1.203+ and enabled dynamic workflows). Do not force-enable workflows against user settings. Confirm the actual request has the ultracode activation reminder and Workflow tool; a successful `xhigh` response alone proves neither workflow activation nor delegation. The bridge invokes model APIs, not a Codex agent. See [CC effort documentation](https://code.claude.com/docs/en/model-config#adjust-effort-level).
 
@@ -231,9 +236,8 @@ Use `claudex --effort ultracode` or interactive `/effort ultracode` to keep CC's
 
 Verify in increasing order of cost:
 
-1. Validate shell syntax with `zsh -n ~/.zshrc` and inspect only non-secret fields of the aliases or wrapper. Confirm `claudex` invokes `claudex-remote-control`, `claudex-direct` retains the custom-base-url fallback, Fable is standard Astra, and Opus uses the recognized `claude-opus-5[1m]` identity routed to standard Sol. Both launch paths must set `fastModePerSessionOptIn: true`, unset `CLAUDE_CODE_DISABLE_FAST_MODE`, set `CLAUDE_CODE_SKIP_FAST_MODE_ORG_CHECK=1`, and select `--model fable --effort xhigh --autocompact 600k`. Terra and Luna stay unsuffixed, and `CLAUDE_CODE_MAX_CONTEXT_TOKENS=1000000` remains scoped to these launchers.
-2. Confirm the listener matches the authorized exposure: localhost by default, or the user's explicitly selected network interface and firewall scope.
-3. Query `GET /v1/models` with the local proxy key and confirm these client-visible IDs are present:
+1. In `proxy-only` or `all`, confirm the local listener matches the authorized exposure: loopback by default, or the user's exact approved interface, TLS termination, and firewall scope. Verify correct-key success and wrong-key/missing-key rejection.
+2. Query the selected proxy's `GET /v1/models` without printing the key and confirm these client-visible IDs are present:
    - `gpt-6-astra`
    - `gpt-6-astra-fast`
    - `gpt-5.6-sol`
@@ -241,18 +245,19 @@ Verify in increasing order of cost:
    - `claude-opus-5`
    - `gpt-5.6-terra`
    - `gpt-5.6-luna`
-4. Send a minimal non-interactive request through `claudex-direct` with no model override and require an exact response plus `gpt-6-astra[1m]` in the JSON model usage. This verifies the default Fable mapping, not just an explicitly selected model ID.
-5. Repeat through `claudex-direct --model opus` with Fast off and require `claude-opus-5[1m]`, `contextWindow: 1000000`, and a standard service tier. Run `python3 scripts/verify_fast.py` and require the captured Fast-off request to omit `speed`, while Fast-on sends `speed: "fast"` plus `fast-mode-2026-02-01`. Then send a minimal real Fast-on request and inspect `service_tier` separately; describe Priority as unconfirmed unless returned metadata reports it.
-6. Start `claudex`, confirm the Remote Control banner appears, run `/model`, and confirm the Fable, Opus, Sonnet, and Haiku entries resolve to their intended client identities. Run `/fast on` and `/fast off` on Opus and verify routectl selects the `sol` route for both while only the Fast-on request carries native Fast intent.
+3. In `proxy-only`, send minimal Responses API requests to canonical Astra and Sol. Check exact output, resolved canonical model, and returned effort. If testing Fast translation directly, distinguish an accepted native Fast request from an upstream-confirmed Priority tier. Stop after the proxy checks; no local Claude launcher is expected.
+4. In `client-only` or `all`, validate `zsh -n ~/.zshrc`, launcher syntax, profile file permissions, and only non-secret launcher fields. Confirm `claudex` invokes `claudex-remote-control`, `claudex-direct` retains the selected custom-base-url path, Fable is standard Astra, and Opus uses `claude-opus-5[1m]` routed to standard Sol. Both launchers must set `fastModePerSessionOptIn: true`, unset `CLAUDE_CODE_DISABLE_FAST_MODE`, set `CLAUDE_CODE_SKIP_FAST_MODE_ORG_CHECK=1`, and select `--model fable --effort xhigh --autocompact 600k`.
+5. In `client-only` or `all`, send a minimal request through `claudex-direct` with no model override and require `gpt-6-astra[1m]`. Repeat with `--model opus`, Fast off, and require `claude-opus-5[1m]`, `contextWindow: 1000000`, and a standard service tier. Run `python3 scripts/verify_fast.py`; require Fast off to omit `speed`, while Fast on sends `speed: "fast"` plus `fast-mode-2026-02-01`. Inspect returned `service_tier` separately and describe Priority as unconfirmed unless upstream metadata reports it.
+6. In `client-only` or `all`, start `claudex`, confirm the Remote Control banner appears, and verify Fable, Opus, and both native Fast states route as intended. Complete the official phone/web E2E gate before reporting Remote Control as fully verified.
 
 For the default/Opus model, Read tool round-trip, and 1M client-accounting checks, run the included standard-library verifier:
 
 ```bash
-python3 scripts/verify_profile.py --claudex "$HOME/cliproxyapi/claudex"
+python3 scripts/verify_profile.py
 python3 scripts/verify_fast.py
 ```
 
-Run it from this skill directory. Repeat with `--effort max` and `--effort ultracode` as appropriate. It invokes the executable wrapper directly, so pass its actual path when the install uses a different layout. For a shell-only alias, use the manual checks below and a small read-only tool request. The verifier does not establish upstream Priority or context capacity. When updating effort or ultracode behavior, read [references/verification.md](references/verification.md) for the client-wire and real-upstream tests; do not confuse either stage alone with full E2E verification.
+Run these from this skill directory in `client-only` or `all`. Repeat the profile verifier with `--effort max` and `--effort ultracode` as appropriate. It invokes `~/.local/bin/claudex-direct` by default; pass `--claudex` when the install uses a different layout. The verifiers do not establish upstream Priority or context capacity. Read [references/verification.md](references/verification.md) for the client-wire and real-upstream tests; do not confuse either stage alone with full E2E verification.
 
 Example minimal checks after loading the shell config:
 
@@ -275,11 +280,11 @@ claudex-direct -p --tools "" --no-session-persistence \
 
 Require the reported model name to retain `[1m]` and `contextWindow: 1000000` before reporting success. The settings change Claude Code's model profile, management, and auto-compaction ceiling for this invocation; they do not prove that 1M tokens of user files fit in one request or raise a smaller upstream limit. Keep verification prompts small unless the user explicitly requests a costly near-limit test.
 
-## 8. Configure the default official Remote Control entrypoint
+## 8. Configure the default official Remote Control entrypoint (`client-only` and `all`)
 
-Do not add Remote Control to the custom-base-url `claudex-direct` alias: Claude Code rejects that combination. The default `claudex` alias must instead invoke the routectl launcher, which uses a process-scoped HTTPS proxy. It re-injects only Anthropic inference paths into a loopback router backed by CLIProxyAPI, while Anthropic control-plane traffic remains first-party.
+Skip this section in `proxy-only`. Do not add Remote Control to the custom-base-url `claudex-direct` alias: Claude Code rejects that combination. The default `claudex` alias must instead invoke the routectl launcher, which uses a process-scoped HTTPS proxy. It re-injects only Anthropic inference paths into a loopback router backed by the selected local or external CLIProxyAPI endpoint, while Anthropic control-plane traffic remains first-party.
 
-Read [references/remote-control.md](references/remote-control.md) completely before installing routectl or generating its CA. Pin and review the documented source commit, keep CLIProxyAPI on `127.0.0.1:8317`, routectl HTTP on `127.0.0.1:8787`, and routectl MITM on `127.0.0.1:8443`. Leave routectl listener auth off for this single-user loopback path and store the CLIProxy key in a mode-0600 file referenced by `file://`; never embed it in TOML, the launcher, logs, or chat.
+Read [references/remote-control.md](references/remote-control.md) completely before installing routectl or generating its CA. Pin and review the documented source commit. Keep routectl HTTP on `127.0.0.1:8787` and routectl MITM on `127.0.0.1:8443`; in `all`, keep CLIProxyAPI on `127.0.0.1:8317`. Leave routectl listener auth off for this single-user loopback path. Set its provider URL to the value in `~/.config/claudex/proxy-url` and its `api_key_ref` to the absolute `file://` URL for `~/.config/claudex/proxy.key`; never embed the key in TOML, the launcher, logs, or chat.
 
 Launch with the included script after routectl is healthy:
 
@@ -304,6 +309,7 @@ Do not declare success from an active `/remote-control` banner alone. Send a ran
 
 ## 9. Modify mappings safely
 
+- In `client-only`, do not mutate the external proxy unless the user separately authorized and provided access to administer it. Client model labels can change locally, but the target IDs and native Fast translation must already exist upstream.
 - To change Claude Code's Fable, Opus, Sonnet, Haiku, or Subagent selection, patch only the corresponding environment variable and the trailing default `--model` when requested. This profile uses Fable/standard Astra by default and a recognized Opus 5 identity routed to standard Sol; native `/fast` dynamically requests Priority on that same Sol route. Both client identities use `[1m]` and CC-selected effort (launch default `xhigh`); keep Terra and Luna unsuffixed unless their upstream context support is separately verified.
 - To expose another client-visible alias, add it under `oauth-model-alias.codex`, keep the canonical upstream name in `name`, and decide explicitly whether `fork` should preserve the original.
 - To attach request behavior to an alias, add a narrowly matched `payload` rule with `protocol: "codex"`.
@@ -312,7 +318,7 @@ Do not declare success from an active `/remote-control` banner alone. Send a ran
 ## Troubleshooting
 
 - **Expired device code:** rerun `--codex-device-login` and use the new code.
-- **401 from the local endpoint:** make the proxy key in Claude Code match one entry under `api-keys`.
+- **401 from the selected endpoint:** make `~/.config/claudex/proxy.key` match one key accepted by that proxy. In `client-only`, do not change the external service without separate authorization.
 - **Unknown model:** inspect `/v1/models`, confirm the OAuth account exposes the unsuffixed canonical model, and verify the alias is under the `codex` channel. Keep `[1m]` out of the CLIProxyAPI OAuth alias configuration and off Terra/Luna mappings.
 - **Alias replaces the original:** set `fork: true` on the Astra Fast, legacy Sol Fast, and `claude-opus-5` aliases, then restart or reload the proxy.
 - **`/fast` says ON but the request has no `speed`:** confirm Opus is client-visible as a supported Claude identity such as `claude-opus-5[1m]`, not directly as `gpt-5.6-sol[1m]`. Run `verify_fast.py` before changing gateway rules.
@@ -322,7 +328,7 @@ Do not declare success from an active `/remote-control` banner alone. Send a ran
 - **Claude Code shows stale mappings:** open a new shell or source the startup file, then restart Claude Code. If Claude Code starts from a GUI or a different shell, configure that launch environment because it may not read `.zshrc`.
 - **Claude Code still reports less than 1M:** confirm both the `[1m]` suffix and `1000000` environment variable are present in the selected `claudex` or `claudex-direct` launcher, start a fresh shell, and repeat the JSON `modelUsage` check through `claudex-direct`.
 - **Remote Control says custom base URL is unsupported:** confirm `claudex` resolves to `claudex-remote-control`, not `claudex-direct`. Do not spoof first-party mode or add more auth variables. Verify the routectl service and CA, then relaunch `claudex`; see [references/remote-control.md](references/remote-control.md).
-- **Remote Control starts but inference reaches Anthropic:** verify the Claude child has no custom base/auth variables, the process has routectl's `HTTPS_PROXY` and CA, and the routectl aliases target the local CLIProxy Fast models. Require a CLIProxy request-count increase and routectl model evidence.
+- **Remote Control starts but inference reaches Anthropic:** verify the Claude child has no custom base/auth variables, the process has routectl's `HTTPS_PROXY` and CA, and the routectl provider targets the same selected proxy as `claudex-direct`. Require a proxy request-count increase and routectl model evidence.
 - **The phone shows Fable or Opus instead of Astra or Sol:** this is expected first-party UI labeling, not proof of the upstream route. Verify the named session, terminal model header, and routectl/CLIProxy request evidence.
 - **The phone model picker changes its checkmark but not the route:** stop using that picker for custom IDs. Launch or select the separately named Astra or Sol session; use the local terminal when preserving and switching an existing conversation is mandatory.
 - **Service repeatedly restarts:** inspect `journalctl --user -u cliproxyapi.service`, validate YAML, verify binary permissions, and confirm the auth directory is writable under the service sandbox.
@@ -330,4 +336,4 @@ Do not declare success from an active `/remote-control` banner alone. Send a ran
 
 ## Handoff
 
-Report the installed version, active paths, service state, exposed model IDs, shell mapping, and minimal request results. State whether Fast routing merely succeeded or whether Priority processing was actually confirmed. Never include credentials or OAuth file contents.
+Report the selected mode, installed components, active paths, service state for components this machine owns, redacted proxy origin, exposed model IDs, shell mapping when present, and minimal request results. State whether native Fast routing merely succeeded or whether Priority processing was actually confirmed. List any mode-specific gate that could not be run. Never include credentials or OAuth file contents.

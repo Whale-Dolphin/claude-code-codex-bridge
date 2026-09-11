@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -36,6 +37,10 @@ def verify_client(wrapper: Path, timeout: int) -> None:
                     'model': body.get('model'),
                     'thinking_type': body.get('thinking', {}).get('type'),
                     'effort': body.get('output_config', {}).get('effort'),
+                    'proxy_auth': (
+                        self.headers.get('Authorization') ==
+                        'Bearer effort-test-placeholder'
+                    ),
                     'workflow_tool': any(t.get('name') == 'Workflow'
                                          for t in body.get('tools', [])),
                     'ultracode_active': 'Ultracode is on' in json.dumps(
@@ -71,42 +76,50 @@ def verify_client(wrapper: Path, timeout: int) -> None:
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         try:
-            settings = {'env': {
-                'ANTHROPIC_BASE_URL': f'http://127.0.0.1:{server.server_port}',
-                'ANTHROPIC_AUTH_TOKEN': 'effort-test-placeholder',
-                'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC': '1',
-            }}
-            for label, model in CLIENT_ROUTES.items():
-                for effort in ('default', *LEVELS, 'ultracode'):
-                    records.clear()
-                    model_args = [] if label == 'fable' else ['--model', label]
-                    effort_args = [] if effort == 'default' else ['--effort', effort]
-                    with tempfile.TemporaryDirectory(prefix='claudex-effort-') as cwd:
-                        result = subprocess.run([
-                            str(wrapper), '-p', *model_args, *effort_args,
-                            '--settings', json.dumps(settings), '--setting-sources', '',
-                            '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
-                            '--no-session-persistence', '--output-format', 'json',
-                            'Reply exactly EFFORT_OK',
-                        ], cwd=cwd, capture_output=True, text=True, timeout=timeout)
-                    if result.returncode:
-                        raise SystemExit(f'{label}/{effort}: CC exited {result.returncode}')
-                    response = json.loads(result.stdout)
-                    expected = 'xhigh' if effort in ('default', 'ultracode') else effort
-                    passed = (
-                        not response.get('is_error') and response.get('result') == 'EFFORT_OK'
-                        and bool(records)
-                        and all(r['model'] == model and r['effort'] == expected
-                                and r['thinking_type'] == 'adaptive'
-                                and r['ultracode_active'] == (effort == 'ultracode')
-                                and (effort != 'ultracode' or r['workflow_tool'])
-                                for r in records)
-                    )
-                    print(json.dumps({'stage': 'client', 'route': label,
-                                      'selected_effort': effort, 'passed': passed,
-                                      'requests': records}), flush=True)
-                    if not passed:
-                        raise SystemExit(f'{label}/{effort}: CC wire contract failed')
+            settings = {'env': {'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC': '1'}}
+            with tempfile.TemporaryDirectory(prefix='claudex-config-') as config_dir:
+                config_path = Path(config_dir)
+                (config_path / 'proxy-url').write_text(
+                    f'http://127.0.0.1:{server.server_port}\n', encoding='utf-8')
+                key_path = config_path / 'proxy.key'
+                key_path.write_text('effort-test-placeholder\n', encoding='utf-8')
+                key_path.chmod(0o600)
+                env = os.environ.copy()
+                env['CLAUDEX_CONFIG_DIR'] = config_dir
+                for label, model in CLIENT_ROUTES.items():
+                    for effort in ('default', *LEVELS, 'ultracode'):
+                        records.clear()
+                        model_args = [] if label == 'fable' else ['--model', label]
+                        effort_args = [] if effort == 'default' else ['--effort', effort]
+                        with tempfile.TemporaryDirectory(prefix='claudex-effort-') as cwd:
+                            result = subprocess.run([
+                                str(wrapper), '-p', *model_args, *effort_args,
+                                '--settings', json.dumps(settings), '--setting-sources', '',
+                                '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
+                                '--no-session-persistence', '--output-format', 'json',
+                                'Reply exactly EFFORT_OK',
+                            ], cwd=cwd, env=env, capture_output=True, text=True,
+                               timeout=timeout)
+                        if result.returncode:
+                            raise SystemExit(f'{label}/{effort}: CC exited {result.returncode}')
+                        response = json.loads(result.stdout)
+                        expected = 'xhigh' if effort in ('default', 'ultracode') else effort
+                        passed = (
+                            not response.get('is_error')
+                            and response.get('result') == 'EFFORT_OK'
+                            and bool(records)
+                            and all(r['model'] == model and r['effort'] == expected
+                                    and r['thinking_type'] == 'adaptive'
+                                    and r['proxy_auth']
+                                    and r['ultracode_active'] == (effort == 'ultracode')
+                                    and (effort != 'ultracode' or r['workflow_tool'])
+                                    for r in records)
+                        )
+                        print(json.dumps({'stage': 'client', 'route': label,
+                                          'selected_effort': effort, 'passed': passed,
+                                          'requests': records}), flush=True)
+                        if not passed:
+                            raise SystemExit(f'{label}/{effort}: CC wire contract failed')
         finally:
             server.shutdown()
             thread.join()
@@ -146,8 +159,17 @@ def verify_upstream(base_url: str, key: str, timeout: int) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('stage', choices=('client', 'upstream'))
-    parser.add_argument('--claudex', type=Path, default=Path.home() / 'cliproxyapi/claudex')
-    parser.add_argument('--base-url', default='http://127.0.0.1:8317')
+    parser.add_argument(
+        '--claudex',
+        type=Path,
+        default=Path.home() / '.local/bin/claudex-direct',
+    )
+    parser.add_argument(
+        '--config-dir',
+        type=Path,
+        default=Path.home() / '.config/claudex',
+    )
+    parser.add_argument('--base-url')
     keys = parser.add_mutually_exclusive_group()
     keys.add_argument('--key-file', type=Path)
     keys.add_argument('--key-stdin', action='store_true')
@@ -156,12 +178,21 @@ def main() -> None:
     if args.stage == 'client':
         verify_client(args.claudex.expanduser().resolve(strict=True), args.timeout)
     else:
-        if not args.key_file and not args.key_stdin:
-            parser.error('upstream requires --key-file or --key-stdin; never put keys in argv')
-        key = (args.key_file.expanduser().read_text() if args.key_file else sys.stdin.read()).strip()
+        config_dir = args.config_dir.expanduser()
+        base_url = args.base_url
+        key_file = args.key_file.expanduser() if args.key_file else config_dir / 'proxy.key'
+        try:
+            if base_url is None:
+                base_url = (config_dir / 'proxy-url').read_text(encoding='utf-8').strip()
+            key = (sys.stdin.read() if args.key_stdin
+                   else key_file.read_text(encoding='utf-8')).strip()
+        except OSError as exc:
+            parser.error(str(exc))
+        if not base_url:
+            parser.error('empty proxy URL')
         if not key:
             parser.error('empty proxy key')
-        verify_upstream(args.base_url, key, args.timeout)
+        verify_upstream(base_url, key, args.timeout)
 
 
 if __name__ == '__main__':

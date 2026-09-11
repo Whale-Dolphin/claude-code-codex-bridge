@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+die() {
+  printf 'claudex-direct: %s\n' "$*" >&2
+  exit 1
+}
+
+claude_bin=${CLAUDE_BIN:-}
+if [[ -z "$claude_bin" ]]; then
+  claude_bin=$(command -v claude) || die 'claude is not installed or not on PATH'
+fi
+
+config_root=${CLAUDEX_CONFIG_DIR:-${XDG_CONFIG_HOME:-"$HOME/.config"}/claudex}
+url_file=${CLAUDEX_PROXY_URL_FILE:-"$config_root/proxy-url"}
+key_file=${CLAUDEX_PROXY_KEY_FILE:-"$config_root/proxy.key"}
+
+[[ -f "$url_file" && -r "$url_file" ]] || die "cannot read proxy URL file: $url_file"
+[[ -f "$key_file" && -r "$key_file" ]] || die "cannot read proxy key file: $key_file"
+
+base_url=$(<"$url_file")
+proxy_key=$(<"$key_file")
+base_url=${base_url%/}
+
+[[ -n "$base_url" ]] || die 'proxy URL is empty'
+[[ -n "$proxy_key" ]] || die 'proxy key is empty'
+[[ "$base_url" != *$'\n'* && "$base_url" != *$'\r'* && "$base_url" != *[[:space:]]* ]] ||
+  die 'proxy URL must be one line without whitespace'
+[[ "$proxy_key" != *$'\n'* && "$proxy_key" != *$'\r'* ]] ||
+  die 'proxy key must contain exactly one line'
+case "$base_url" in
+  http://?*|https://?*) ;;
+  *) die 'proxy URL must start with http:// or https://' ;;
+esac
+[[ "$base_url" != *'?'* && "$base_url" != *'#'* && "$base_url" != *'@'* ]] ||
+  die 'proxy URL must not contain credentials, a query, or a fragment'
+
+key_mode=$(stat -f '%Lp' "$key_file" 2>/dev/null || stat -c '%a' "$key_file" 2>/dev/null || true)
+if [[ -n "$key_mode" ]] && (( (8#$key_mode & 077) != 0 )); then
+  die "proxy key file permissions are too broad: $key_file (expected 0600 or stricter)"
+fi
+
+exec env \
+  -u CLAUDE_CODE_USE_BEDROCK \
+  -u CLAUDE_CODE_SKIP_BEDROCK_AUTH \
+  -u CLAUDE_CODE_USE_VERTEX \
+  -u CLAUDE_CODE_USE_FOUNDRY \
+  -u CLAUDE_CODE_DISABLE_FAST_MODE \
+  -u CLAUDE_CODE_EFFORT_LEVEL \
+  ANTHROPIC_BASE_URL="$base_url" \
+  ANTHROPIC_AUTH_TOKEN="$proxy_key" \
+  ANTHROPIC_API_KEY='' \
+  CLAUDE_CODE_SKIP_FAST_MODE_ORG_CHECK='1' \
+  ANTHROPIC_DEFAULT_FABLE_MODEL='gpt-6-astra[1m]' \
+  ANTHROPIC_DEFAULT_OPUS_MODEL='claude-opus-5[1m]' \
+  ANTHROPIC_DEFAULT_SONNET_MODEL='gpt-5.6-terra' \
+  ANTHROPIC_DEFAULT_HAIKU_MODEL='gpt-5.6-luna' \
+  CLAUDE_CODE_SUBAGENT_MODEL='gpt-6-astra[1m]' \
+  CLAUDE_CODE_MAX_CONTEXT_TOKENS='1000000' \
+  CLAUDE_CODE_ALWAYS_ENABLE_EFFORT='1' \
+  CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY='3' \
+  ENABLE_TOOL_SEARCH='false' \
+  "$claude_bin" \
+    --model fable \
+    --effort xhigh \
+    --autocompact 600k \
+    --settings '{"fastModePerSessionOptIn":true}' \
+    "$@"

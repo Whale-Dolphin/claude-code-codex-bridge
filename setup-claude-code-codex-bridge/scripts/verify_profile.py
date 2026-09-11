@@ -11,7 +11,11 @@ from pathlib import Path
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--claudex', type=Path, default=Path.home() / 'cliproxyapi/claudex')
+    parser.add_argument(
+        '--claudex',
+        type=Path,
+        default=Path.home() / '.local/bin/claudex-direct',
+    )
     parser.add_argument('--timeout', type=int, default=120)
     parser.add_argument('--effort', choices=('low', 'medium', 'high', 'xhigh', 'max', 'ultracode'))
     args = parser.parse_args()

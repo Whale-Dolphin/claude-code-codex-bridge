@@ -1,17 +1,30 @@
 # claude-code-codex-bridge
 
-A Codex skill for installing, configuring, verifying, and troubleshooting a local [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) bridge from Codex OAuth to Claude Code.
+A Codex skill for installing, configuring, verifying, and troubleshooting a [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) bridge from Codex OAuth to Claude Code. The proxy and Claude client can be installed together or on different machines.
+
+## Installation modes
+
+The skill asks for one of three component modes before changing the machine:
+
+| Mode | Installed here | Proxy used by local `claudex` |
+| --- | --- | --- |
+| `proxy-only` | CLIProxyAPI, Codex OAuth, proxy service | No local client is installed |
+| `client-only` | Claude Code launchers, client profile, routectl | External URL and key supplied by the user |
+| `all` | Proxy and client components | Local `http://127.0.0.1:8317` proxy |
+
+`client-only` and `all` share `~/.config/claudex/proxy-url` plus a mode-`0600` `proxy.key`. The URL and key are kept out of shell aliases, so switching the selected proxy does not require rewriting the model profile. See [installation modes](setup-claude-code-codex-bridge/references/install-modes.md) for the exact component and security boundaries.
 
 ## What it configures
 
-- A localhost-only CLIProxyAPI service backed by Codex OAuth
+- A localhost-only CLIProxyAPI service backed by Codex OAuth in `proxy-only` and `all`
+- A reusable `claudex-direct` launcher for either a local or external proxy in `client-only` and `all`
 - A standard Astra route for Fable plus a standard Sol route for Opus, with explicit legacy Fast aliases still available
 - Claude Code native `/fast` mapped dynamically from Opus 5 to Codex Priority processing on Sol
 - A 1M Claude Code managed context profile for Fable and Opus, activated with `[1m]` model suffixes and scoped to `claudex` and `claudex-direct`
-- A default official Remote Control launcher that keeps Anthropic's control plane first-party while selectively routing inference through the local bridge
+- A default official Remote Control launcher that keeps Anthropic's control plane first-party while selectively routing inference through the selected bridge
 - A `600K` auto-compaction working window that preserves the `1M` profile while leaving room to summarize before the upstream limit
-- A hardened user-level systemd service
-- End-to-end model-list, normal-route, Fast-route, and shell validation
+- A hardened user-level systemd service for a locally installed proxy
+- Mode-specific model-list, standard-route, native-Fast, client, and Remote Control validation
 
 ## Default Claude Code mappings
 
@@ -81,7 +94,7 @@ The standard-library profile verifier sends two real requests through the instal
 
 ```bash
 python3 setup-claude-code-codex-bridge/scripts/verify_profile.py \
-  --claudex "$HOME/cliproxyapi/claudex"
+  --claudex "$HOME/.local/bin/claudex-direct"
 python3 setup-claude-code-codex-bridge/scripts/verify_fast.py
 ```
 
@@ -89,11 +102,11 @@ Repeat with `--effort max` to verify tool use and 1M accounting at the highest n
 
 ## Default official Remote Control
 
-Claude Code rejects official Remote Control when `ANTHROPIC_BASE_URL` is custom. The default `claudex` entrypoint therefore leaves Claude's first-party URL and subscription authentication untouched, then uses routectl's loopback-only selective MITM proxy to send only inference paths to CLIProxyAPI. The included launcher removes conflicting base URL, auth, provider, proxy, disabled-traffic, and fixed-effort variables before starting the official Remote Control session. `claudex-direct` preserves the custom-base-url path as an explicit fallback.
+Claude Code rejects official Remote Control when `ANTHROPIC_BASE_URL` is custom. The default `claudex` entrypoint therefore leaves Claude's first-party URL and subscription authentication untouched, then uses routectl's loopback-only selective MITM proxy to send only inference paths to the selected local or external CLIProxyAPI endpoint. The included launcher removes conflicting base URL, auth, provider, proxy, disabled-traffic, and fixed-effort variables before starting the official Remote Control session. `claudex-direct` preserves the custom-base-url path as an explicit fallback.
 
 The selective Remote Control path was previously validated end to end with Astra Fast. The current Fable default is standard Astra, so that route still requires the deployment/mobile gate after installation. Opus→standard Sol and Opus native Fast→Sol Priority-request paths were validated through the same official-base-url proxy path with managed context `1000000`; the upstream response reported the standard tier, so a Priority grant remains unconfirmed.
 
-This is security-sensitive because the reviewed local process terminates TLS for `api.anthropic.com` and can see the full-scope Claude session token. All three listeners remain on loopback, the CA is scoped to one Claude process, and prompt/body logging is disabled. Read the pinned source, configuration, rollback steps, security boundary, and full test matrix in [official Remote Control compatibility](setup-claude-code-codex-bridge/references/remote-control.md) before enabling it.
+This is security-sensitive because the reviewed local process terminates TLS for `api.anthropic.com` and can see the full-scope Claude session token. Both routectl listeners remain on loopback; in `all`, CLIProxyAPI does too. The CA is scoped to one Claude process, and prompt/body logging is disabled. Read the pinned source, configuration, rollback steps, security boundary, and full test matrix in [official Remote Control compatibility](setup-claude-code-codex-bridge/references/remote-control.md) before enabling it.
 
 ### Mobile model labels and switching
 
@@ -120,12 +133,12 @@ cp -R claude-code-codex-bridge/setup-claude-code-codex-bridge \
 Restart Codex after installation, then invoke it with:
 
 ```text
-Use $setup-claude-code-codex-bridge to configure Fable as standard Astra, map Opus standard mode to Sol, map Claude Code native /fast to Sol Priority, keep [1m], default to xhigh and auto-compact at 600k, preserve CC ultracode, and verify both Fast states.
+Use $setup-claude-code-codex-bridge to install the bridge. Ask me to choose proxy-only, client-only, or all first; for client-only, collect the external proxy URL and key securely. Preserve Fable/standard Astra, Opus/standard Sol, native /fast to Sol Priority, [1m], effort, and Remote Control behavior, then verify the selected components.
 ```
 
 ## Security
 
-This repository contains no OAuth credentials, API keys, device codes, local proxy configuration, or shell configuration copied from a real machine. The examples use placeholders and bind the proxy to `127.0.0.1` by default.
+This repository contains no OAuth credentials, API keys, device codes, local proxy configuration, or shell configuration copied from a real machine. The examples use placeholders and bind locally installed services to `127.0.0.1` by default. External client profiles should use HTTPS across untrusted networks.
 
 Before publishing changes, stage only the files in this repository and run a secret scan. Never add `~/.zshrc`, `~/.codex/auth.json`, `~/.cli-proxy-api/`, or a live `config.yaml`.
 
@@ -139,9 +152,11 @@ Before publishing changes, stage only the files in this repository and run a sec
     ├── agents/
     │   └── openai.yaml
     ├── references/
+    │   ├── install-modes.md
     │   ├── remote-control.md
     │   └── verification.md
     └── scripts/
+        ├── claudex-direct
         ├── claudex-remote-control
         ├── verify_effort.py
         ├── verify_fast.py

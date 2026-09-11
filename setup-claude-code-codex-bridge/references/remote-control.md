@@ -2,7 +2,7 @@
 
 Claude Code disables official Remote Control when `ANTHROPIC_BASE_URL` points at a custom endpoint. The supported bridge profile therefore keeps that direct path under `claudex-direct` and makes the default `claudex` alias invoke the routectl launcher.
 
-The verified compatibility path uses routectl's loopback-only selective MITM proxy. Claude Code still sees `https://api.anthropic.com`: routectl re-injects only `/v1/messages`, `/v1/messages/count_tokens`, and `/v1/models` into its local router, then sends those requests to CLIProxyAPI. Anthropic control-plane requests remain first-party traffic and every other host uses an opaque CONNECT tunnel.
+The verified compatibility path uses routectl's loopback-only selective MITM proxy. Claude Code still sees `https://api.anthropic.com`: routectl re-injects only `/v1/messages`, `/v1/messages/count_tokens`, and `/v1/models` into its local router, then sends those requests to the selected local or external CLIProxyAPI endpoint. Anthropic control-plane requests remain first-party traffic and every other host uses an opaque CONNECT tunnel.
 
 ```text
 Claude Code / official mobile app
@@ -15,7 +15,7 @@ Claude Code / official mobile app
         |                       |
  routectl 127.0.0.1:8787   api.anthropic.com
         |
- CLIProxyAPI 127.0.0.1:8317
+ selected CLIProxyAPI endpoint
         |
  Codex OAuth: standard Astra / Sol standard or native-Fast Priority request
 ```
@@ -49,14 +49,14 @@ The validated proxy suite passed 78 tests. Re-run it on the target host and re-r
 
 ## Prerequisites
 
-1. Finish the normal CLIProxyAPI setup and verify canonical Astra, canonical Sol, and the `claude-opus-5` → Sol alias locally. The explicit Astra Fast alias may remain available for older clients.
+1. Finish `all` mode's local CLIProxyAPI setup or obtain an already working external endpoint for `client-only`. Verify canonical Astra, canonical Sol, and the `claude-opus-5` → Sol alias at the selected endpoint. The explicit Astra Fast alias may remain available for older clients.
 2. Sign Claude Code into a subscription account with `claude auth login --claudeai`. `claude auth status --json` must report `loggedIn: true`, `authMethod: claude.ai`, and a subscription type that supports Remote Control.
-3. Store the CLIProxyAPI local key in a separate mode-0600 file for routectl. Do not put the key in the routectl TOML or launcher.
-4. Keep CLIProxyAPI, routectl's HTTP listener, and its MITM listener on loopback. Do not expose 8317, 8787, or 8443.
+3. Store the selected CLIProxyAPI key in `~/.config/claudex/proxy.key` with mode `0600`. Do not put the key in the routectl TOML or launcher.
+4. Keep routectl's HTTP and MITM listeners on loopback. In `all`, keep CLIProxyAPI on loopback as well. An external proxy's exposure policy belongs to that proxy host and must already be authorized.
 
 ## routectl configuration
 
-Replace the absolute paths and `tested_cc_version`. `api_key_ref` must point at the same random local key accepted by CLIProxyAPI. Intentionally omit `[server.auth]`: routectl's MITM re-injection carries Claude's OAuth header, so listener auth would reject it.
+Replace the absolute paths, provider URL, and `tested_cc_version`. Set `base_url` to the exact value stored in `~/.config/claudex/proxy-url`; set `api_key_ref` to the absolute `file://` URL for the same `proxy.key` used by `claudex-direct`. Intentionally omit `[server.auth]`: routectl's MITM re-injection carries Claude's OAuth header, so listener auth would reject it.
 
 ```toml
 [server]
@@ -74,8 +74,8 @@ credential_source = "own"
 
 [providers.cliproxy]
 kind = "anthropic-api"
-base_url = "http://127.0.0.1:8317"
-api_key_ref = "file:///home/you/.config/routectl/cliproxy.key"
+base_url = "<proxy-base-url>"
+api_key_ref = "file:///home/you/.config/claudex/proxy.key"
 auth_kind = "api-key"
 
 [models.astra]
@@ -179,8 +179,8 @@ References for these boundaries:
 | Stage | Contract | Fixture | Assertion | Command | Frequency | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | routectl source | Selective MITM implementation is intact | Pinned source | Proxy, CA, split, control-plane, and log-redaction tests pass | `cargo test --locked -p routectl-cli proxy:: -- --test-threads=1` | Pin update | 78 passed on validated Ubuntu |
-| Local binds | No new public listener | Three processes | 8317, 8787, and 8443 bind only to loopback | `ss -lntp` | Deployment | Passed on validated Ubuntu |
-| Access boundary | CLIProxy key still protects inference | Correct, wrong, missing key | 200, 401, 401 | `GET /v1/models` against 8317 | Deployment | Passed on validated Ubuntu |
+| Local binds | No new public listener | routectl plus optional local CLIProxyAPI | 8787 and 8443 bind only to loopback; 8317 does too in `all` | `ss -lntp` | Deployment | Passed for `all` on validated Ubuntu |
+| Access boundary | CLIProxy key still protects inference | Correct, wrong, missing key | 200, 401, 401 | `GET /v1/models` against the selected endpoint | Deployment | Passed for the validated local endpoint |
 | TLS split | Only inference is re-injected | Real CONNECT/TLS requests | `/v1/models` comes from routectl; `/api/hello` reaches Anthropic; other host is blind-tunneled | `curl --proxy ... --cacert ...` | Claude/routectl update | Passed on validated Ubuntu |
 | Fable path | Official URL with no custom auth reaches Astra | Exact short prompt | Exact text, standard Astra route, managed context 1000000 | `claude -p --model fable ...` with only process-scoped proxy/CA | Deployment | Required after installing this default change |
 | Opus standard path | Official URL with no custom auth reaches Sol | Exact short prompt, native Fast off | Exact text, `sol` route, managed context 1000000, standard tier | `claude -p --model opus --settings '{"fastMode":false}' ...` | Deployment | Passed on Claude Code 2.1.268 |
@@ -192,7 +192,7 @@ Claude Code versions may normalize the `modelUsage` key differently. For Opus, r
 
 ## Security and rollback
 
-routectl terminates TLS for `api.anthropic.com` locally, so the process can see Claude requests and the full-scope Claude session token. Use only the reviewed pinned source, keep every listener on loopback, set prompt/body logging controls, and scope the CA through the launcher instead of exporting it in the shell.
+routectl terminates TLS for `api.anthropic.com` locally, so the process can see Claude requests and the full-scope Claude session token. Use only the reviewed pinned source, keep both routectl listeners on loopback, set prompt/body logging controls, and scope the CA through the launcher instead of exporting it in the shell. In `client-only`, use HTTPS when the selected proxy crosses an untrusted network so routectl does not send prompts and the proxy key in plaintext.
 
 To disable the compatibility layer, exit the Remote Control process, stop routectl, and launch ordinary `claude` without the launcher. Removing `[mitm]` and restarting routectl removes the extra listener. The `claudex-direct` custom-base-url profile remains available as the independent bridge fallback.
 
