@@ -18,27 +18,27 @@ The skill asks for one of three component modes before changing the machine:
 
 - A localhost-only CLIProxyAPI service backed by Codex OAuth in `proxy-only` and `all`
 - A reusable `claudex-direct` launcher for either a local or external proxy in `client-only` and `all`
-- Optional `gpt-6-astra-fast` and default Opus `gpt-5.6-sol-fast` client aliases, each following Claude Code's effort and requesting Priority processing
-- Claude Code `/model` mappings with Fable as the default standard Astra route and Opus as the Sol Fast route
-- A 1M Claude Code managed context profile for the default Astra and Sol Fast routes, activated with `[1m]` model suffixes and scoped to `claudex` and `claudex-direct`
+- An optional `gpt-6-astra-fast` alias plus a proxy-wide rule that makes every canonical `gpt-5.6-sol` request ask for Priority processing
+- Claude Code `/model` mappings with Fable as the default standard Astra route and Opus as the canonical Sol Priority route
+- A 1M Claude Code managed context profile for the default Astra and canonical Sol routes, activated with `[1m]` model suffixes and scoped to `claudex` and `claudex-direct`
 - A default official Remote Control launcher that keeps Anthropic's control plane first-party while selectively routing inference through the selected bridge
 - A `600K` auto-compaction working window that preserves the `1M` profile while leaving room to summarize before the upstream limit
 - A hardened user-level systemd service for a locally installed proxy
-- Mode-specific model-list, standard-route, Fast-alias, client, and Remote Control validation
+- Mode-specific model-list, standard-route, Priority-request, client, and Remote Control validation
 
 ## Default Claude Code mappings
 
 | Claude Code label | Model | Reasoning / processing |
 | --- | --- | --- |
 | Fable (default) | `gpt-6-astra[1m]` | CC effort (default `xhigh`) / standard processing |
-| Opus | `gpt-5.6-sol-fast[1m]` | CC effort (default `xhigh`) / requested Priority |
+| Opus | `gpt-5.6-sol[1m]` | CC effort (default `xhigh`) / requested Priority |
 | Sonnet | `gpt-5.6-terra` | Existing provider behavior |
 | Haiku | `gpt-5.6-luna` | Existing provider behavior |
 | Subagent | `gpt-6-astra[1m]` | CC-selected effort / standard processing |
 
-Each Fast entry is a client-visible alias for its canonical upstream model (`gpt-6-astra` or `gpt-5.6-sol`). Keep `fork: true` so the canonical routes remain available. The bridge overrides only `service_tier: priority` for the two explicit Fast aliases; it must not override `reasoning.effort`. `claudex` launches official Remote Control through routectl with `--model fable --effort xhigh --autocompact 600k`, where Fable resolves to canonical Astra without requesting Priority. Use `claudex --model opus` or `/model` to select Sol Fast; use `claudex-direct` only when a non-Remote-Control fallback is required. The Astra Fast alias remains available for an explicit custom mapping.
+Opus maps directly to canonical `gpt-5.6-sol`; there is no separate Sol alias. The proxy applies `service_tier: priority` to every canonical Sol request without overriding `reasoning.effort`. `claudex` launches official Remote Control through routectl with `--model fable --effort xhigh --autocompact 600k`, where Fable resolves to canonical Astra without requesting Priority. Use `claudex --model opus` or `/model` to select Sol. The optional Astra Fast alias remains available for an explicit custom mapping and keeps `fork: true` so canonical Astra remains available. Use `claudex-direct` only when a non-Remote-Control fallback is required.
 
-The `[1m]` suffix belongs to the Claude Code-facing names; Terra and Luna remain unsuffixed, and CLIProxyAPI's aliases and canonical IDs remain unsuffixed. The skill reports Priority processing as confirmed only when upstream response metadata confirms it. A successful Fast alias response alone does not establish a Priority grant.
+The `[1m]` suffix belongs to the Claude Code-facing names; Terra and Luna remain unsuffixed, and CLIProxyAPI's aliases and canonical IDs remain unsuffixed. The skill reports Priority processing as confirmed only when upstream response metadata confirms it. A successful canonical Sol response proves routing, but does not by itself establish a Priority grant.
 
 ## Effort and ultracode
 
@@ -59,7 +59,7 @@ These are parameter mappings, not equal token/compute budgets across models. See
 
 ## 1M context profile with 600K auto-compaction
 
-The skill combines Claude Code-facing `[1m]` suffixes on standard Astra and Sol Fast with this client-side context setting inside both launch paths:
+The skill combines Claude Code-facing `[1m]` suffixes on standard Astra and canonical Sol with this client-side context setting inside both launch paths:
 
 ```zsh
 CLAUDE_CODE_MAX_CONTEXT_TOKENS="1000000"
@@ -86,13 +86,13 @@ Repeat with `--effort max` to verify tool use and 1M accounting at the highest n
 
 Claude Code rejects official Remote Control when `ANTHROPIC_BASE_URL` is custom. The default `claudex` entrypoint therefore leaves Claude's first-party URL and subscription authentication untouched, then uses routectl's loopback-only selective MITM proxy to send only inference paths to the selected local or external CLIProxyAPI endpoint. The included launcher removes conflicting base URL, auth, provider, proxy, disabled-traffic, and fixed-effort variables before starting the official Remote Control session. `claudex-direct` preserves the custom-base-url path as an explicit fallback.
 
-The selective Remote Control path was validated end to end on Ubuntu with the previous Astra Fast default: the exact phone response appeared locally, the CLIProxyAPI request count increased, and routectl recorded the selected route. This revision changes the Fable launcher contract to standard Astra, so that route must pass the deployment/mobile gate again after installation. Opus→Sol Fast at `max` and managed context `1000000` were validated separately through the same official-base-url proxy path.
+The selective Remote Control path was validated end to end on Ubuntu with the previous Astra Fast default: the exact phone response appeared locally, the CLIProxyAPI request count increased, and routectl recorded the selected route. This revision changes the Fable launcher contract to standard Astra, so that route must pass the deployment/mobile gate again after installation. The earlier Opus validation used the removed Sol alias; the new canonical Sol Priority rule must pass the deployment gate after installation.
 
 This is security-sensitive because the reviewed local process terminates TLS for `api.anthropic.com` and can see the full-scope Claude session token. Both routectl listeners remain on loopback; in `all`, CLIProxyAPI does too. The CA is scoped to one Claude process, and prompt/body logging is disabled. Read the pinned source, configuration, rollback steps, security boundary, and full test matrix in [official Remote Control compatibility](setup-claude-code-codex-bridge/references/remote-control.md) before enabling it.
 
 ### Mobile model labels and switching
 
-The official Claude mobile app and `claude.ai/code` keep their built-in Claude-family labels; the bridge cannot replace that picker with Codex model names. In this profile, a Remote Control session launched as Fable requests `gpt-6-astra[1m]`, while one launched as Opus requests `gpt-5.6-sol-fast[1m]`. The phone can therefore show `Fable 5.1` or `Opus 5` even though routectl and CLIProxyAPI are serving Astra or Sol. Verify the terminal header and routectl/CLIProxy evidence rather than treating the mobile label as the upstream model name.
+The official Claude mobile app and `claude.ai/code` keep their built-in Claude-family labels; the bridge cannot replace that picker with Codex model names. In this profile, a Remote Control session launched as Fable requests `gpt-6-astra[1m]`, while one launched as Opus requests `gpt-5.6-sol[1m]`. The phone can therefore show `Fable 5.1` or `Opus 5` even though routectl and CLIProxyAPI are serving Astra or Sol. Verify the terminal header and routectl/CLIProxy evidence rather than treating the mobile label as the upstream model name.
 
 Running `claudex` creates a Remote Control session named `Claudex Remote Control`. For reliable phone-only selection between Astra and Sol, start two explicitly named sessions:
 
@@ -115,7 +115,7 @@ cp -R claude-code-codex-bridge/setup-claude-code-codex-bridge \
 Restart Codex after installation, then invoke it with:
 
 ```text
-Use $setup-claude-code-codex-bridge to install the bridge. Ask me to choose proxy-only, client-only, or all first; for client-only, collect the external proxy URL and key securely. Preserve Fable/standard Astra, Opus/Sol Fast, [1m], effort, and Remote Control behavior, then verify the selected components.
+Use $setup-claude-code-codex-bridge to install the bridge. Ask me to choose proxy-only, client-only, or all first; for client-only, collect the external proxy URL and key securely and verify that the remote proxy applies Priority to every canonical Sol request. Preserve Fable/standard Astra, Opus/canonical Sol Priority, [1m], effort, and Remote Control behavior, then verify the selected components.
 ```
 
 ## Security

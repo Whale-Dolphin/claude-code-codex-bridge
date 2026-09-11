@@ -14,7 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 
-ROUTES = {'fable': 'gpt-6-astra', 'opus': 'gpt-5.6-sol-fast'}
+ROUTES = {'fable': 'gpt-6-astra', 'opus': 'gpt-5.6-sol'}
 LEVELS = ('low', 'medium', 'high', 'xhigh', 'max')
 
 
@@ -128,9 +128,11 @@ def verify_upstream(base_url: str, key: str, timeout: int) -> None:
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     for label, model in ROUTES.items():
         for effort in LEVELS:
+            requested_service_tier = 'priority' if label == 'opus' else 'default'
             body = {
                 'model': model, 'input': 'Reply exactly EFFORT_OK',
-                'reasoning': {'effort': effort}, 'service_tier': 'default',
+                'reasoning': {'effort': effort},
+                'service_tier': requested_service_tier,
                 'store': False, 'max_output_tokens': 256,
             }
             request = urllib.request.Request(
@@ -145,10 +147,11 @@ def verify_upstream(base_url: str, key: str, timeout: int) -> None:
                              for c in item.get('content', [])
                              if c.get('type') == 'output_text').strip()
             actual_effort = payload.get('reasoning', {}).get('effort')
-            passed = (payload.get('model') == model.removesuffix('-fast')
+            passed = (payload.get('model') == model
                       and actual_effort == effort and output == 'EFFORT_OK')
             print(json.dumps({'stage': 'upstream', 'route': label, 'passed': passed,
                               'requested_effort': effort, 'upstream_effort': actual_effort,
+                              'requested_service_tier': requested_service_tier,
                               'upstream_model': payload.get('model'),
                               'upstream_service_tier': payload.get('service_tier')}), flush=True)
             if not passed:

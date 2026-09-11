@@ -17,7 +17,7 @@ Claude Code / official mobile app
         |
  selected CLIProxyAPI endpoint
         |
- Codex OAuth: standard Astra / Sol Fast
+ Codex OAuth: standard Astra / canonical Sol Priority
 ```
 
 This is a compatibility layer, not a way to make Claude Code accept a custom `ANTHROPIC_BASE_URL` directly.
@@ -47,7 +47,7 @@ The validated proxy suite passed 78 tests. Re-run it on the target host and re-r
 
 ## Prerequisites
 
-1. Finish `all` mode's local CLIProxyAPI setup or obtain an already working external endpoint for `client-only`. Verify canonical Astra plus the Sol Fast alias at the selected endpoint. The optional Astra Fast alias may remain configured for explicit use.
+1. Finish `all` mode's local CLIProxyAPI setup or obtain an already working external endpoint for `client-only`. Verify canonical Astra and canonical Sol at the selected endpoint, and verify that the proxy applies Priority to every canonical Sol request. The optional Astra Fast alias may remain configured for explicit use.
 2. Sign Claude Code into a subscription account with `claude auth login --claudeai`. `claude auth status --json` must report `loggedIn: true`, `authMethod: claude.ai`, and a subscription type that supports Remote Control.
 3. Store the selected CLIProxyAPI key in `~/.config/claudex/proxy.key` with mode `0600`. Do not put the key in the routectl TOML or launcher.
 4. Keep routectl's HTTP and MITM listeners on loopback. In `all`, keep CLIProxyAPI on loopback as well. An external proxy's exposure policy belongs to that proxy host and must already be authorized.
@@ -92,10 +92,10 @@ supports_adaptive_thinking = true
 effort_levels = ["low", "medium", "high", "xhigh", "max"]
 visible_routectl_provider = false
 
-[models.sol-fast]
+[models.sol]
 provider = "cliproxy"
-upstream = "gpt-5.6-sol-fast"
-reported_model = "gpt-5.6-sol-fast[1m]"
+upstream = "gpt-5.6-sol"
+reported_model = "gpt-5.6-sol[1m]"
 supports_adaptive_thinking = true
 effort_levels = ["low", "medium", "high", "xhigh", "max"]
 visible_routectl_provider = false
@@ -105,8 +105,8 @@ visible_routectl_provider = false
 "gpt-6-astra[1m]" = "astra"
 "gpt-6-astra-fast" = "astra-fast"
 "gpt-6-astra-fast[1m]" = "astra-fast"
-"gpt-5.6-sol-fast" = "sol-fast"
-"gpt-5.6-sol-fast[1m]" = "sol-fast"
+"gpt-5.6-sol" = "sol"
+"gpt-5.6-sol[1m]" = "sol"
 default = "astra"
 ```
 
@@ -129,7 +129,7 @@ ROUTECTL_CONFIG="$HOME/.config/routectl/config.toml" \
   scripts/claudex-remote-control "My workstation"
 ```
 
-The launcher parses `routectl rc env` without `eval`, refuses a non-loopback proxy, and verifies the generated CA. It explicitly removes custom base URL, API key, provider, global proxy, disabled-traffic, and fixed-effort variables before starting Claude Code. It then scopes routectl's `HTTPS_PROXY`, CA, standard Astra/Sol Fast mappings, and 1M managed-context setting to that one process and defaults to `--autocompact 600k`.
+The launcher parses `routectl rc env` without `eval`, refuses a non-loopback proxy, and verifies the generated CA. It explicitly removes custom base URL, API key, provider, global proxy, disabled-traffic, and fixed-effort variables before starting Claude Code. It then scopes routectl's `HTTPS_PROXY`, CA, standard Astra/canonical Sol mappings, and 1M managed-context setting to that one process and defaults to `--autocompact 600k`.
 
 The first argument is the Remote Control session name. Additional Claude options are appended after the default `--model fable --effort xhigh --autocompact 600k`, so an explicit later option can override a launch default when the installed Claude Code supports it. The shell-level `claudex` alias supplies `Claudex Remote Control` as that first argument before forwarding user arguments.
 
@@ -140,7 +140,7 @@ The official Claude mobile app and `claude.ai/code` own the Remote Control UI. T
 | Official client label | Launcher selection | Configured bridge route |
 | --- | --- | --- |
 | Fable, currently shown as `Fable 5.1` | default `--model fable` | `gpt-6-astra[1m]` |
-| Opus, currently shown as `Opus 5` | later `--model opus` | `gpt-5.6-sol-fast[1m]` |
+| Opus, currently shown as `Opus 5` | later `--model opus` | `gpt-5.6-sol[1m]` |
 
 The displayed version text is controlled by Anthropic and can change independently of this repository. Do not use it as route evidence. The phone may also display its own effort wording; require the terminal and captured request to establish the effective model and effort.
 
@@ -170,11 +170,11 @@ References for these boundaries:
 | Access boundary | CLIProxy key still protects inference | Correct, wrong, missing key | 200, 401, 401 | `GET /v1/models` against the selected endpoint | Deployment | Passed for the validated local endpoint |
 | TLS split | Only inference is re-injected | Real CONNECT/TLS requests | `/v1/models` comes from routectl; `/api/hello` reaches Anthropic; other host is blind-tunneled | `curl --proxy ... --cacert ...` | Claude/routectl update | Passed on validated Ubuntu |
 | Fable path | Official URL with no custom auth reaches Astra | Exact short prompt | Exact text, standard Astra route, managed context 1000000 | `claude -p --model fable ...` with only process-scoped proxy/CA | Deployment | Required after installing this default change |
-| Opus path | Official URL with no custom auth reaches Sol | Exact short prompt at `max` | Exact text, Sol Fast route, managed context 1000000 | `claude -p --model opus --effort max ...` | Deployment | Passed on validated Ubuntu |
+| Opus path | Official URL with no custom auth reaches Sol | Exact short prompt at `max` | Exact text, canonical Sol route, managed context 1000000; inspect Priority metadata separately | `claude -p --model opus --effort max ...` | Deployment | Required after installing the canonical Sol rule |
 | Mobile E2E | Official Remote Control operates the local session while inference uses the bridge | Message sent from official mobile client | Phone message and exact response appear locally; CLIProxy request count increases; routectl records standard Astra | Launcher, then send a random exact-response prompt from phone | Claude/routectl update | Required after installing this default change |
-| Named Sol session | Phone can select a Sol-specific session without an in-session model change | Launcher with `--model opus`, exact short prompt, mobile sync | Terminal reports Sol Fast, routectl records Sol Fast, exact response appears in the official client | Start the second named launcher session and inspect local route evidence | Claude/routectl update | Passed on Claude Code 2.1.263 |
+| Named Sol session | Phone can select a Sol-specific session without an in-session model change | Launcher with `--model opus`, exact short prompt, mobile sync | Terminal reports canonical Sol, routectl records canonical Sol, exact response appears in the official client | Start the second named launcher session and inspect local route evidence | Claude/routectl update | Required after installing the canonical Sol rule |
 
-Claude Code versions may normalize the `modelUsage` key differently. Accept the selected name with `[1m]` or without it only when the resolved route is correct and `contextWindow` is exactly `1000000`. This remains client-side managed context, not proof of 1M upstream capacity. Treat Priority as unconfirmed unless returned metadata reports it; the validated Fast requests reported the standard tier.
+Claude Code versions may normalize the `modelUsage` key differently. Accept the selected name with `[1m]` or without it only when the resolved route is correct and `contextWindow` is exactly `1000000`. This remains client-side managed context, not proof of 1M upstream capacity. Treat Priority as unconfirmed unless returned metadata reports it. Earlier alias-based Sol validation does not prove the new canonical Sol rule is active.
 
 ## Security and rollback
 
