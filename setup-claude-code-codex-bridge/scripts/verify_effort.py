@@ -14,7 +14,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 
-ROUTES = {'fable': 'gpt-6-astra', 'opus': 'gpt-5.6-sol'}
+ROUTES = {
+    'fable': 'gpt-6-astra',
+    'opus': 'gpt-5.6-sol',
+    'sonnet': 'gpt-5.6-terra',
+    'haiku': 'gpt-5.6-luna',
+}
 LEVELS = ('low', 'medium', 'high', 'xhigh', 'max')
 
 
@@ -128,7 +133,9 @@ def verify_upstream(base_url: str, key: str, timeout: int) -> None:
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     for label, model in ROUTES.items():
         for effort in LEVELS:
-            requested_service_tier = 'priority' if label == 'opus' else 'default'
+            requested_service_tier = (
+                'priority' if model.startswith('gpt-5.6-') else 'default'
+            )
             body = {
                 'model': model, 'input': 'Reply exactly EFFORT_OK',
                 'reasoning': {'effort': effort},
@@ -147,15 +154,21 @@ def verify_upstream(base_url: str, key: str, timeout: int) -> None:
                              for c in item.get('content', [])
                              if c.get('type') == 'output_text').strip()
             actual_effort = payload.get('reasoning', {}).get('effort')
+            actual_service_tier = payload.get('service_tier')
+            tier_confirmed = actual_service_tier == requested_service_tier
             passed = (payload.get('model') == model
-                      and actual_effort == effort and output == 'EFFORT_OK')
+                      and actual_effort == effort and output == 'EFFORT_OK'
+                      and tier_confirmed)
             print(json.dumps({'stage': 'upstream', 'route': label, 'passed': passed,
                               'requested_effort': effort, 'upstream_effort': actual_effort,
                               'requested_service_tier': requested_service_tier,
                               'upstream_model': payload.get('model'),
-                              'upstream_service_tier': payload.get('service_tier')}), flush=True)
+                              'upstream_service_tier': actual_service_tier,
+                              'tier_confirmed': tier_confirmed}), flush=True)
             if not passed:
-                raise SystemExit(f'{label}/{effort}: upstream effort or model mismatch')
+                raise SystemExit(
+                    f'{label}/{effort}: upstream model, effort, output, or tier mismatch'
+                )
 
 
 def main() -> None:

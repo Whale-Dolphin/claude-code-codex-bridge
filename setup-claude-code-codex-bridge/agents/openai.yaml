@@ -1,4 +1,4 @@
 interface:
   display_name: "Setup Claude Code Codex Bridge"
   short_description: "Install local or external Astra/Sol bridge modes"
-  default_prompt: "Use $setup-claude-code-codex-bridge to ask me to choose proxy-only, client-only, or all, then install and verify only the selected components. For client-only, collect the external proxy URL and key securely and verify the remote proxy applies Priority to every canonical Sol request. Preserve Fable/standard Astra, Opus/canonical Sol Priority, [1m], effort, and Remote Control behavior."
+  default_prompt: "Use $setup-claude-code-codex-bridge to ask me to choose proxy-only, client-only, or all, then install and verify only the selected components. For client-only, collect the external proxy URL and key securely. Make every canonical GPT-5.6 Sol, Terra, and Luna request ask for Priority processing while preserving Fable/standard Astra, [1m], effort, and Remote Control behavior."

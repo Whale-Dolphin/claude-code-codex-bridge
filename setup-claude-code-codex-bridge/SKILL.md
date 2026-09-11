@@ -1,11 +1,11 @@
 ---
 name: setup-claude-code-codex-bridge
-description: "Install, upgrade, configure, and verify a CLIProxyAPI bridge from Codex OAuth to Claude Code in proxy-only, client-only, or all mode. Use for local or external claudex proxy selection, Fable/standard Astra and Opus/Sol Priority mappings, CC effort alignment and ultracode, [1m] context, login, service setup, and official Remote Control compatibility."
+description: "Install, upgrade, configure, and verify a CLIProxyAPI bridge from Codex OAuth to Claude Code in proxy-only, client-only, or all mode. Use for local or external claudex proxy selection, Fable/standard Astra and GPT-5.6-wide Priority mappings, CC effort alignment and ultracode, [1m] context, login, service setup, and official Remote Control compatibility."
 ---
 
 # Setup Claude Code Codex Bridge
 
-Install the proxy component, the Claude Code client component, or both. A client can use CLIProxyAPI on the same machine or an existing external machine. The client profile launches Fable as standard Astra and maps Opus directly to canonical Sol, both with `[1m]`. Every canonical `gpt-5.6-sol` request asks for Priority processing at the proxy. Default to `xhigh` but follow CC effort changes; preserve CC-owned ultracode workflows. Preserve existing configuration and explicitly authorized network exposure, and verify each selected layer before declaring success.
+Install the proxy component, the Claude Code client component, or both. A client can use CLIProxyAPI on the same machine or an existing external machine. The client profile launches Fable as standard Astra and maps Opus directly to canonical Sol, both with `[1m]`. Every canonical GPT-5.6 Sol, Terra, and Luna request asks for Priority processing. Default to `xhigh` but follow CC effort changes; preserve CC-owned ultracode workflows. Preserve existing configuration and explicitly authorized network exposure, and verify each selected layer before declaring success.
 
 ## Operating rules
 
@@ -18,7 +18,8 @@ Install the proxy component, the Claude Code client component, or both. A client
 - Keep CLIProxyAPI's canonical OAuth model names and `/v1/models` entries unsuffixed. The `[1m]` suffix belongs only to Claude Code-facing mappings. If the catalog reports a smaller per-model maximum, report the discrepancy and describe 1M as client-side management rather than proven upstream capacity.
 - Describe 1M as the total managed context window, not 1M of file or prompt input. System instructions, tools, history, output allowance, and compaction consume part of it.
 - Treat `gpt-6-astra-fast` as an optional client-visible alias for `gpt-6-astra`, not as a separate upstream model. Opus uses canonical `gpt-5.6-sol` directly.
-- Request Priority processing for every canonical `gpt-5.6-sol` request and for the optional Astra Fast alias, but do not override `reasoning.effort`: CC must control it. Fable uses canonical Astra and therefore does not request Priority. Remove the old forced `xhigh` rule and the old Sol alias when upgrading this profile. Do not claim the upstream honored Priority unless response metadata confirms that tier.
+- Request Priority processing for every canonical `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna` request and for the optional Astra Fast alias, but do not override `reasoning.effort`: CC must control it. Fable uses canonical Astra and therefore does not request Priority. In the routectl profile, use model-scoped `payload_extras` to overwrite both `service_tier` and `speed` for all three GPT-5.6 routes. Remove the old forced `xhigh` rule and the old Sol alias when upgrading this profile. Do not claim the upstream honored Priority unless response metadata confirms that tier.
+- Do not accept a model-catalog `service_tiers` entry as Fast proof. For CLIProxyAPI-backed Codex OAuth, verify the deployed HTTP/SSE transport with a completed Responses result. If it reports `default`, `auto`, or omits the tier, report Fast as unavailable even though the injected request asked for Priority. Read [references/verification.md](references/verification.md) for the transport boundary.
 - CC `low`, `medium`, `high`, `xhigh`, and `max` map to the same Codex API values. Codex displays `low` as Light and `xhigh` as Extra High. CC `ultracode` sends `xhigh` plus CC-owned dynamic workflows, not Codex `ultra`; never transmit `ultracode` as an API effort or claim Codex agent orchestration is running.
 - Official Remote Control does not accept a custom `ANTHROPIC_BASE_URL`. The default `claudex` entrypoint must use the reviewed routectl selective-MITM path; keep the custom-base-url path available only as `claudex-direct`. Keep Claude's base URL and auth variables unset in Remote Control, keep routectl's listeners on loopback, and read [references/remote-control.md](references/remote-control.md) before acting.
 - The official phone/web model picker keeps Claude-family labels and may not reliably apply a mapped custom model ID to an existing Remote Control session. Treat Fable and Opus as client labels for the configured Astra and Sol launch mappings, verify the actual route locally, and prefer separately named Astra and Sol sessions for phone-only selection. Do not claim that those sessions share conversation history.
@@ -130,11 +131,15 @@ payload:
           protocol: "codex"
         - name: "gpt-5.6-sol"
           protocol: "codex"
+        - name: "gpt-5.6-terra"
+          protocol: "codex"
+        - name: "gpt-5.6-luna"
+          protocol: "codex"
       params:
         service_tier: "priority"
 ```
 
-Keep `fork: true` on the optional Astra alias so canonical Astra remains available. Use `payload.override` only for the Priority service tier. Do not add a default or override reasoning rule: the CC launcher provides the default, and the translator preserves explicit CC effort. Match the optional Astra Fast alias and canonical Sol, so every `gpt-5.6-sol` request asks for Priority while canonical Astra and Terra/Luna retain their existing behavior.
+Keep `fork: true` on the optional Astra alias so canonical Astra remains available. Use `payload.override` only for the Priority service tier. Do not add a default or override reasoning rule: the CC launcher provides the default, and the translator preserves explicit CC effort. Match the optional Astra Fast alias plus canonical Sol, Terra, and Luna, so every GPT-5.6 request asks for Priority while canonical Astra retains standard processing.
 
 Validate the YAML with an available parser before restarting. Never print the unredacted file in tool output.
 
@@ -234,10 +239,10 @@ Verify in increasing order of cost:
    - `gpt-5.6-sol`
    - `gpt-5.6-terra`
    - `gpt-5.6-luna`
-3. In `proxy-only`, send minimal Responses API requests to canonical Astra and canonical Sol. Check exact output, resolved canonical model, returned effort, and reported service tier. Confirm the configured payload rule matches canonical Sol. Stop after the proxy checks; no local Claude launcher is expected.
+3. In `proxy-only`, send minimal Responses API requests to canonical Astra, Sol, Terra, and Luna. Check exact output, resolved canonical model, returned effort, and reported service tier. Confirm the configured payload rule matches all three GPT-5.6 models. Stop after the proxy checks; no local Claude launcher is expected.
 4. In `client-only` or `all`, validate `zsh -n ~/.zshrc`, launcher syntax, profile file permissions, and only non-secret launcher fields. Confirm `claudex` invokes `claudex-remote-control`, `claudex-direct` retains the selected custom-base-url path, Fable is standard Astra, Opus uses `gpt-5.6-sol[1m]`, and both launchers select `--model fable --effort xhigh --autocompact 600k`.
-5. In `client-only` or `all`, send a minimal request through `claudex-direct` with no model override and require `gpt-6-astra[1m]`. Repeat with `--model opus` and require `gpt-5.6-sol[1m]`, `contextWindow: 1000000`, and the canonical Sol route. Inspect the returned service tier separately and describe Priority as unconfirmed unless upstream metadata reports it.
-6. In `client-only` or `all`, start `claudex`, confirm the Remote Control banner appears, and verify Fable and Opus route as intended. Complete the official phone/web E2E gate before reporting Remote Control as fully verified.
+5. In `client-only` or `all`, send a minimal request through `claudex-direct` with no model override and require `gpt-6-astra[1m]`. Repeat with `--model opus`, `sonnet`, and `haiku`, and require canonical Sol, Terra, and Luna respectively. The direct fallback depends on the selected proxy's server-side GPT-5.6 rule. Inspect the returned service tier separately and describe Priority as unconfirmed unless upstream metadata reports it.
+6. In `client-only` or `all`, start `claudex`, confirm the Remote Control banner appears, and verify Fable, Opus, Sonnet, and Haiku route as intended. Capture a redacted routectl test and require the Sol, Terra, and Luna forwarded bodies to contain `service_tier: priority` and `speed: fast`. Complete the official phone/web E2E gate before reporting Remote Control as fully verified.
 
 For the default/Opus model, Read tool round-trip, and 1M client-accounting checks, run the included standard-library verifier:
 
@@ -278,7 +283,7 @@ Launch with the included script after routectl is healthy:
 claudex
 ```
 
-The launcher must unset `ANTHROPIC_BASE_URL`, Anthropic key/token variables, provider flags, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`, and fixed effort overrides. It reads the proxy and CA from `routectl rc env` without `eval`, refuses a non-loopback proxy, scopes all variables to the Claude process, and launches with `--model fable --effort xhigh --autocompact 600k`, the standard Astra/canonical Sol mappings, and the 1M managed-context profile.
+The launcher must unset `ANTHROPIC_BASE_URL`, Anthropic key/token variables, provider flags, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`, and fixed effort overrides. It reads the proxy and CA from `routectl rc env` without `eval`, refuses a non-loopback proxy, scopes all variables to the Claude process, and launches with `--model fable --effort xhigh --autocompact 600k`, the standard Astra/GPT-5.6 mappings, and the 1M managed-context profile.
 
 For reliable phone-side selection, start one named Fable/Astra session and one named Opus/Sol session:
 
@@ -291,12 +296,12 @@ Additional Claude arguments follow the launcher's defaults, so the later `--mode
 
 Do not depend on changing a mapped custom model inside an existing phone-controlled session. With prior assistant output, Claude Code asks for local confirmation before `/model` re-reads the full history, and mobile picker changes can be client-scoped or fail to match a custom model ID. Select the separately named session instead. State the tradeoff clearly: the Astra and Sol sessions do not share conversation context.
 
-Do not declare success from an active `/remote-control` banner alone. Send a random exact-response prompt from the official phone or web client, observe the same message and response in the local session, require a new CLIProxyAPI `/v1/messages` request, and confirm routectl selected standard Astra. Repeat an official-base-url request through the same proxy for Opus/canonical Sol, require `contextWindow: 1000000`, and record the response service tier rather than inferring a Priority grant from successful routing.
+Do not declare success from an active `/remote-control` banner alone. Send a random exact-response prompt from the official phone or web client, observe the same message and response in the local session, require a new CLIProxyAPI `/v1/messages` request, and confirm routectl selected standard Astra. Repeat official-base-url requests through the same proxy for Opus/Sol, Sonnet/Terra, and Haiku/Luna. Require `contextWindow: 1000000` for Sol, capture the three outgoing tier fields, and record the response service tier rather than inferring a Priority grant from successful routing.
 
 ## 9. Modify mappings safely
 
-- In `client-only`, do not mutate the external proxy unless the user separately authorized and provided access to administer it. Client model labels can change locally, but canonical target IDs and the proxy-wide Sol Priority rule must already exist upstream.
-- To change Claude Code's Fable, Opus, Sonnet, Haiku, or Subagent selection, patch only the corresponding environment variable and the trailing default `--model` when requested. This profile uses Fable/standard Astra by default and Opus/canonical Sol Priority; both use `[1m]` and CC-selected effort (launch default `xhigh`). Keep Terra and Luna unsuffixed unless their upstream context support is separately verified.
+- In `client-only`, do not mutate the external proxy unless the user separately authorized and provided access to administer it. Client model labels can change locally, and routectl can inject Priority/Fast on the default Remote Control path, but canonical target IDs and the proxy-wide GPT-5.6 Priority rules must already exist upstream for `claudex-direct`.
+- To change Claude Code's Fable, Opus, Sonnet, Haiku, or Subagent selection, patch only the corresponding environment variable and the trailing default `--model` when requested. This profile uses Fable/standard Astra by default and requests Priority for Opus/Sol, Sonnet/Terra, and Haiku/Luna. Sol uses `[1m]`; keep Terra and Luna unsuffixed unless their upstream context support is separately verified. All routes keep CC-selected effort (launch default `xhigh`).
 - To expose another client-visible alias, add it under `oauth-model-alias.codex`, keep the canonical upstream name in `name`, and decide explicitly whether `fork` should preserve the original.
 - To attach request behavior to an alias, add a narrowly matched `payload` rule with `protocol: "codex"`.
 - Restart or reload the proxy, refresh the shell, and repeat the model-list plus minimal-request checks after every mapping change.
@@ -309,7 +314,7 @@ Do not declare success from an active `/remote-control` banner alone. Send a ran
 - **Astra Fast alias replaces canonical Astra:** set `fork: true` on the Astra Fast alias, then restart or reload the proxy.
 - **Sol stays at xhigh after CC changes effort:** remove the legacy `"reasoning.effort": "xhigh"` payload override while preserving the Priority rule. Inspect `CLAUDE_CODE_EFFORT_LEVEL` precedence and capture CC's `thinking.type` and `output_config.effort`. Verify upstream metadata rather than inferring effort from the model's answer.
 - **Ultracode only behaves like xhigh:** check the CC version, workflow setting, model capability detection, environment effort override, and activation reminder. Report disabled workflows honestly; do not rewrite the upstream effort to `ultra` as a workaround.
-- **Canonical Sol succeeds but reports the standard tier:** the route worked, but the upstream did not confirm Priority processing; report that limitation accurately.
+- **A GPT-5.6 route succeeds but reports the standard tier:** the route worked and the local payload override may have been sent, but Fast is not verified on that deployed path. Check whether CLIProxyAPI forwarded the HTTP/SSE request over its upstream WebSocket executor; do not use successful output, catalog capability, or latency as a substitute for tier evidence.
 - **Claude Code shows stale mappings:** open a new shell or source the startup file, then restart Claude Code. If Claude Code starts from a GUI or a different shell, configure that launch environment because it may not read `.zshrc`.
 - **Claude Code still reports less than 1M:** confirm both the `[1m]` suffix and `1000000` environment variable are present in the selected `claudex` or `claudex-direct` launcher, start a fresh shell, and repeat the JSON `modelUsage` check through `claudex-direct`.
 - **Remote Control says custom base URL is unsupported:** confirm `claudex` resolves to `claudex-remote-control`, not `claudex-direct`. Do not spoof first-party mode or add more auth variables. Verify the routectl service and CA, then relaunch `claudex`; see [references/remote-control.md](references/remote-control.md).
@@ -321,4 +326,4 @@ Do not declare success from an active `/remote-control` banner alone. Send a ran
 
 ## Handoff
 
-Report the selected mode, installed components, active paths, service state for components this machine owns, redacted proxy origin, exposed model IDs, shell mapping when present, and minimal request results. State whether canonical Sol routing worked, whether the proxy-wide Priority rule was installed, and whether Priority processing was actually confirmed. List any mode-specific gate that could not be run. Never include credentials or OAuth file contents.
+Report the selected mode, installed components, active paths, service state for components this machine owns, redacted proxy origin, exposed model IDs, shell mapping when present, and minimal request results. State whether the three canonical GPT-5.6 routes worked, whether the proxy-wide Priority rules and routectl payload overrides were installed, and whether Priority processing was actually confirmed. List any mode-specific gate that could not be run. Never include credentials or OAuth file contents.

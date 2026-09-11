@@ -1,6 +1,6 @@
 # Installation modes
 
-Choose the installation mode before changing files or services. A mode is a component boundary, not a model-mapping choice: every client installation uses the same Fable/Astra, Opus/canonical Sol Priority, effort, context, and Remote Control profile.
+Choose the installation mode before changing files or services. A mode is a component boundary, not a model-mapping choice: every client installation uses the same Fable/Astra, GPT-5.6 Priority, effort, context, and Remote Control profile.
 
 ## Mode matrix
 
@@ -58,10 +58,10 @@ alias claudex='claudex-remote-control "Claudex Remote Control"'
 Run only the local proxy sections of the main skill:
 
 1. Install or upgrade CLIProxyAPI.
-2. Configure the optional Astra Fast alias and the canonical Sol Priority override.
+2. Configure the optional Astra Fast alias and the canonical Sol, Terra, and Luna Priority override.
 3. Complete Codex OAuth device login.
 4. Start the proxy as a user service.
-5. Verify listener scope, key enforcement, model catalog, and minimal Astra/Sol requests.
+5. Verify listener scope, key enforcement, model catalog, and minimal Astra/Sol/Terra/Luna requests.
 
 Skip Claude Code installation, the `~/.config/claudex` profile, both launchers, routectl, and shell aliases.
 
@@ -84,10 +84,11 @@ Confirm the external endpoint provides the contracts this profile needs:
 
 - Anthropic-compatible `/v1/messages`, `/v1/messages/count_tokens`, and `/v1/models` for Claude Code.
 - `gpt-6-astra`, `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna` under the expected names.
-- A server-side rule that applies `service_tier: priority` to every canonical `gpt-5.6-sol` request. The client profile cannot create this rule on an external proxy.
+- Server-side rules that apply `service_tier: priority` to every canonical `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna` request. The local routectl profile also adds `service_tier: priority` and `speed: fast` to these models on the default `claudex` path, but the client cannot create server-side rules on an external proxy for the independent `claudex-direct` fallback.
+- A real streaming or non-streaming response whose completed metadata reports `service_tier: priority`. A catalog `service_tiers` field is only a capability declaration and does not prove the HTTP/SSE transport actually received Priority processing.
 - Responses API support when running the optional real-upstream effort verifier.
 
-Install the shared client profile and both launchers. Configure local routectl with the external URL and `file://` reference to the local protected `proxy.key`; routectl itself remains loopback-only. Verify the default Astra and Opus/canonical Sol paths through `claudex-direct`, inspect the reported service tier separately, then verify the official Remote Control path.
+Install the shared client profile and both launchers. Configure local routectl with the external URL and `file://` reference to the local protected `proxy.key`; routectl itself remains loopback-only. Add model-scoped `payload_extras` for canonical Sol, Terra, and Luna so the default Remote Control path always sends `service_tier: priority` and `speed: fast`. Verify all four model paths through `claudex-direct`, inspect the reported service tier separately, then verify the official Remote Control path and its local payload overrides.
 
 ## `all`
 
