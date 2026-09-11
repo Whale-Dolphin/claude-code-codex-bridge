@@ -1,6 +1,6 @@
 # Installation modes
 
-Choose the installation mode before changing files or services. A mode is a component boundary, not a model-mapping choice: every client installation uses the same Fable/Astra, recognized Opus 5 to standard Sol, native `/fast` to Sol Priority, effort, context, and Remote Control profile.
+Choose the installation mode before changing files or services. A mode is a component boundary, not a model-mapping choice: every client installation uses the same Fable/Astra, Opus/Sol Fast, effort, context, and Remote Control profile.
 
 ## Mode matrix
 
@@ -58,7 +58,7 @@ alias claudex='claudex-remote-control "Claudex Remote Control"'
 Run only the local proxy sections of the main skill:
 
 1. Install or upgrade CLIProxyAPI.
-2. Configure the Codex aliases and the native Fast to Sol Priority translation.
+2. Configure the Codex Fast aliases and their Priority overrides.
 3. Complete Codex OAuth device login.
 4. Start the proxy as a user service.
 5. Verify listener scope, key enforcement, model catalog, and minimal Astra/Sol requests.
@@ -83,10 +83,10 @@ Require HTTPS when the endpoint crosses an untrusted network. If the user suppli
 Confirm the external endpoint provides the contracts this profile needs:
 
 - Anthropic-compatible `/v1/messages`, `/v1/messages/count_tokens`, and `/v1/models` for Claude Code.
-- `gpt-6-astra`, `gpt-5.6-sol`, `claude-opus-5`, `gpt-5.6-terra`, and `gpt-5.6-luna` under the expected names.
+- `gpt-6-astra`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, and `gpt-5.6-luna` under the expected names.
 - Responses API support when running the optional real-upstream effort verifier.
 
-Install the shared client profile and both launchers. Configure local routectl with the external URL and `file://` reference to the local protected `proxy.key`; routectl itself remains loopback-only. Verify `claudex-direct`, both native Fast states, and then the official Remote Control path.
+Install the shared client profile and both launchers. Configure local routectl with the external URL and `file://` reference to the local protected `proxy.key`; routectl itself remains loopback-only. Verify the default Astra and Opus/Sol Fast paths through `claudex-direct`, then verify the official Remote Control path.
 
 ## `all`
 

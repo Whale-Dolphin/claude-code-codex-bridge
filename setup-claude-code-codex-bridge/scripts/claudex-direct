@@ -45,14 +45,12 @@ exec env \
   -u CLAUDE_CODE_SKIP_BEDROCK_AUTH \
   -u CLAUDE_CODE_USE_VERTEX \
   -u CLAUDE_CODE_USE_FOUNDRY \
-  -u CLAUDE_CODE_DISABLE_FAST_MODE \
   -u CLAUDE_CODE_EFFORT_LEVEL \
   ANTHROPIC_BASE_URL="$base_url" \
   ANTHROPIC_AUTH_TOKEN="$proxy_key" \
   ANTHROPIC_API_KEY='' \
-  CLAUDE_CODE_SKIP_FAST_MODE_ORG_CHECK='1' \
   ANTHROPIC_DEFAULT_FABLE_MODEL='gpt-6-astra[1m]' \
-  ANTHROPIC_DEFAULT_OPUS_MODEL='claude-opus-5[1m]' \
+  ANTHROPIC_DEFAULT_OPUS_MODEL='gpt-5.6-sol-fast[1m]' \
   ANTHROPIC_DEFAULT_SONNET_MODEL='gpt-5.6-terra' \
   ANTHROPIC_DEFAULT_HAIKU_MODEL='gpt-5.6-luna' \
   CLAUDE_CODE_SUBAGENT_MODEL='gpt-6-astra[1m]' \
@@ -64,5 +62,4 @@ exec env \
     --model fable \
     --effort xhigh \
     --autocompact 600k \
-    --settings '{"fastModePerSessionOptIn":true}' \
     "$@"

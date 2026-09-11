@@ -14,8 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 
-CLIENT_ROUTES = {'fable': 'gpt-6-astra', 'opus': 'claude-opus-5'}
-UPSTREAM_ROUTES = {'fable': 'gpt-6-astra', 'opus': 'gpt-5.6-sol'}
+ROUTES = {'fable': 'gpt-6-astra', 'opus': 'gpt-5.6-sol-fast'}
 LEVELS = ('low', 'medium', 'high', 'xhigh', 'max')
 
 
@@ -86,7 +85,7 @@ def verify_client(wrapper: Path, timeout: int) -> None:
                 key_path.chmod(0o600)
                 env = os.environ.copy()
                 env['CLAUDEX_CONFIG_DIR'] = config_dir
-                for label, model in CLIENT_ROUTES.items():
+                for label, model in ROUTES.items():
                     for effort in ('default', *LEVELS, 'ultracode'):
                         records.clear()
                         model_args = [] if label == 'fable' else ['--model', label]
@@ -127,7 +126,7 @@ def verify_client(wrapper: Path, timeout: int) -> None:
 
 def verify_upstream(base_url: str, key: str, timeout: int) -> None:
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-    for label, model in UPSTREAM_ROUTES.items():
+    for label, model in ROUTES.items():
         for effort in LEVELS:
             body = {
                 'model': model, 'input': 'Reply exactly EFFORT_OK',
