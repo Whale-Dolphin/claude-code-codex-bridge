@@ -13,7 +13,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 
-ROUTES = {'fable': 'gpt-6-astra', 'opus': 'gpt-5.6-sol-fast'}
+CLIENT_ROUTES = {'fable': 'gpt-6-astra', 'opus': 'claude-opus-5'}
+UPSTREAM_ROUTES = {'fable': 'gpt-6-astra', 'opus': 'gpt-5.6-sol'}
 LEVELS = ('low', 'medium', 'high', 'xhigh', 'max')
 
 
@@ -75,7 +76,7 @@ def verify_client(wrapper: Path, timeout: int) -> None:
                 'ANTHROPIC_AUTH_TOKEN': 'effort-test-placeholder',
                 'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC': '1',
             }}
-            for label, model in ROUTES.items():
+            for label, model in CLIENT_ROUTES.items():
                 for effort in ('default', *LEVELS, 'ultracode'):
                     records.clear()
                     model_args = [] if label == 'fable' else ['--model', label]
@@ -113,7 +114,7 @@ def verify_client(wrapper: Path, timeout: int) -> None:
 
 def verify_upstream(base_url: str, key: str, timeout: int) -> None:
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-    for label, model in ROUTES.items():
+    for label, model in UPSTREAM_ROUTES.items():
         for effort in LEVELS:
             body = {
                 'model': model, 'input': 'Reply exactly EFFORT_OK',
